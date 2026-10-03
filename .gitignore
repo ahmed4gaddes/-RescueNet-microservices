@@ -1,0 +1,11 @@
+logs/
+**/target/
+**/node_modules/
+**/__pycache__/
+**/.venv/
+**/bin/
+**/obj/
+*.joblib
+.idea/
+*.exe
+.vscode/

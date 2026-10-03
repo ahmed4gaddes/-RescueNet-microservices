@@ -1,0 +1,109 @@
+name: rescuenet
+
+# Infrastructure RescueNet : une base de données de moteur différent par service + RabbitMQ.
+# Les ports hôte évitent le PostgreSQL local (5432) : PostgreSQL Docker -> 5433.
+
+services:
+  postgres-emergency:
+    image: postgres:16-alpine
+    container_name: rescuenet-postgres
+    environment:
+      POSTGRES_DB: emergency_db
+      POSTGRES_USER: rescue
+      POSTGRES_PASSWORD: rescue123
+    ports:
+      - "5433:5432"
+    volumes:
+      - rescuenet_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rescue -d emergency_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-patients:
+    image: mongo:7
+    container_name: rescuenet-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - rescuenet_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mysql-triage:
+    image: mysql:8.4
+    container_name: rescuenet-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: triage_db
+      MYSQL_USER: rescue
+      MYSQL_PASSWORD: rescue123
+    ports:
+      - "3306:3306"
+    volumes:
+      - rescuenet_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prescue123", "-urescue"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  sqlserver-hospital:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: rescuenet-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Rescue_123!"
+      MSSQL_MEMORY_LIMIT_MB: "1536"
+    ports:
+      - "1433:1433"
+    volumes:
+      - rescuenet_sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c '</dev/tcp/localhost/1433'"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  redis-dispatch:
+    image: redis:7-alpine
+    container_name: rescuenet-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - rescuenet_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rescuenet-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: rescue
+      RABBITMQ_DEFAULT_PASS: rescue123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rescuenet_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+volumes:
+  rescuenet_postgres_data:
+  rescuenet_mongo_data:
+  rescuenet_mysql_data:
+  rescuenet_sqlserver_data:
+  rescuenet_redis_data:
+  rescuenet_rabbitmq_data:

@@ -1,0 +1,8 @@
+{
+  "callerPhone": "+21698123456",
+  "nationalId": "12345678",
+  "age": 58,
+  "location": { "lat": 36.806, "lng": 10.18 },
+  "symptoms": ["douleur thoracique intense", "sueurs froides"],
+  "vitals": { "heartRate": 128, "spo2": 88, "systolicBP": 95, "consciousness": "ALERT", "painLevel": 9 }
+}
