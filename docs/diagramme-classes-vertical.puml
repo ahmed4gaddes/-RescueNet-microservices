@@ -1,0 +1,288 @@
+@startuml RescueNet_Vertical
+title RescueNet — Diagramme de classes
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam nodesep 25
+skinparam ranksep 30
+skinparam dpi 150
+hide empty members
+
+' =====================================================
+' 1 - EMERGENCY-SERVICE  (Java · PostgreSQL)
+' =====================================================
+package "1 - emergency-service  (Java · PostgreSQL)" #FFF1E0 {
+
+  class EmergencyRequest <<DTO>> {
+    +callerPhone : String
+    +nationalId : String
+    +symptoms : List<String>
+    +age : Integer
+  }
+
+  class Location <<sous-objet>> {
+    +lat : Double
+    +lng : Double
+  }
+
+  class Vitals <<sous-objet>> {
+    +heartRate : Integer
+    +spo2 : Integer
+    +systolicBP : Integer
+    +consciousness : String
+    +painLevel : Integer
+  }
+
+  class Mission <<Entity>> {
+    +id : String
+    +status : MissionStatus
+    +callerPhone : String
+    +nationalId : String
+    +patientId : String
+    +age : Integer
+    +latitude : double
+    +longitude : double
+    +symptoms : String
+    --triage--
+    +severity : String
+    +score : Double
+    +specialty : String
+    --hôpital--
+    +hospitalId : Integer
+    +hospitalName : String
+    +reservationId : String
+    --ambulance--
+    +ambulanceId : String
+    +etaMinutes : Double
+    --suivi--
+    +failureReason : String
+    +createdAt : Instant
+    +updatedAt : Instant
+  }
+
+  enum MissionStatus {
+    CREATED
+    TRIAGED
+    BED_RESERVED
+    DISPATCHED
+    ON_SCENE
+    TRANSPORTING
+    COMPLETED
+    FAILED
+  }
+
+  EmergencyRequest *-down- Location
+  EmergencyRequest *-down- Vitals
+  Location -[hidden]down- Mission
+  Vitals -[hidden]down- Mission
+  EmergencyRequest ..> Mission : crée
+  Mission -right-> MissionStatus
+}
+
+' =====================================================
+' 2 - PATIENT-RECORD-SERVICE  (NodeJS · MongoDB)
+' =====================================================
+package "2 - patient-record-service  (NodeJS · MongoDB)" #E8F6EA {
+
+  class Patient <<Document>> {
+    +_id : ObjectId
+    +nationalId : String
+    +fullName : String
+    +age : Number
+    +gender : Gender
+    +bloodType : String
+    +allergies : String[]
+    +chronicConditions : String[]
+    +medications : String[]
+    +temporary : Boolean
+  }
+
+  enum Gender {
+    M
+    F
+  }
+
+  class Contact <<sous-document>> {
+    +name : String
+    +phone : String
+  }
+
+  class Intervention <<sous-document>> {
+    +missionId : String
+    +severity : String
+    +hospitalName : String
+    +symptoms : String[]
+    +date : Date
+  }
+
+  Patient -right-> Gender
+  Patient "1" *-down- "0..1" Contact : emergencyContact
+  Patient "1" *-down- "0..*" Intervention : interventions
+}
+
+' =====================================================
+' 3 - TRIAGE-AI-SERVICE  (Python · MySQL)
+' =====================================================
+package "3 - triage-ai-service  (Python · MySQL)" #E6EEF8 {
+
+  class TriageRequest <<DTO>> {
+    +age : int
+    +symptoms : list[str]
+    +medicalHistory : list[str]
+  }
+
+  class TriageRecord <<Entity · triage_records>> {
+    +id : int
+    +created_at : datetime
+    +severity : Severity
+    +score : float
+    +specialty : Specialty
+    +request : JSON
+  }
+
+  class "Vitals" as TriageVitals <<sous-objet>> {
+    +heartRate : int
+    +spo2 : int
+    +systolicBP : int
+    +consciousness : Consciousness
+    +painLevel : int
+  }
+
+  enum Consciousness {
+    ALERT
+    VOICE
+    PAIN
+    UNRESPONSIVE
+  }
+
+  enum Severity {
+    VERT
+    ORANGE
+    ROUGE
+  }
+
+  enum Specialty {
+    CARDIOLOGY
+    NEUROLOGY
+    TRAUMA
+    PULMONOLOGY
+    GENERAL
+  }
+
+  TriageRequest -right-> TriageRecord : donne
+  TriageRequest *-down- TriageVitals
+  TriageVitals -down-> Consciousness
+  TriageRecord -down-> Severity
+  TriageRecord -down-> Specialty
+}
+
+' =====================================================
+' 4 - HOSPITAL-SERVICE  (C# · SQL Server)
+' =====================================================
+package "4 - hospital-service  (C# · SQL Server)" #F2E9FB {
+
+  class Hospital <<Entity>> {
+    +Id : int
+    +Name : string
+    +City : string
+    +Latitude : double
+    +Longitude : double
+    +Specialties : string
+    +TotalBeds : int
+    +AvailableBeds : int
+  }
+
+  class BedReservation <<Entity>> {
+    +Id : Guid
+    +HospitalId : int
+    +MissionId : string
+    +Specialty : string
+    +Severity : string
+    +Status : ReservationStatus
+    +CreatedAt : DateTime
+  }
+
+  enum ReservationStatus {
+    RESERVED
+    ADMITTED
+    RELEASED
+  }
+
+  Hospital "1" -down- "0..*" BedReservation : contient
+  BedReservation -right-> ReservationStatus
+}
+
+' =====================================================
+' 5 - DISPATCH-SERVICE  (Go · Redis)
+' =====================================================
+package "5 - dispatch-service  (Go · Redis)" #E3F7F9 {
+
+  class DispatchMission <<struct>> {
+    +MissionID : string
+    +AmbulanceID : string
+    +Severity : string
+    +Phase : MissionPhase
+    +Pickup : Point
+    +Hospital : Point
+  }
+
+  class Ambulance <<struct>> {
+    +ID : string
+    +Plate : string
+    +Status : AmbulanceStatus
+    +MissionID : string
+    +Position : Point
+  }
+
+  class Point <<sous-objet>> {
+    +Lat : float64
+    +Lng : float64
+  }
+
+  enum MissionPhase {
+    TO_SCENE
+    ON_SCENE
+    TO_HOSPITAL
+    ARRIVED
+    DONE
+  }
+
+  enum AmbulanceStatus {
+    AVAILABLE
+    ASSIGNED
+  }
+
+  DispatchMission -right-> Ambulance : utilise
+  DispatchMission -down-> MissionPhase
+  Ambulance -down-> AmbulanceStatus
+  DispatchMission *-down- "2" Point : Pickup, Hospital
+  Ambulance *-down- Point : Position
+}
+
+' =====================================================
+' Empilement vertical des services
+' =====================================================
+Intervention -[hidden]down- TriageRequest
+Specialty -[hidden]down- Hospital
+ReservationStatus -[hidden]down- DispatchMission
+
+' =====================================================
+' RELATIONS ENTRE SERVICES  (références logiques)
+' =====================================================
+Mission ..> Patient : patientId
+Mission ..> TriageRecord : severity,\nspecialty
+Mission ..> Hospital : hospitalId
+Mission ..> BedReservation : reservationId
+Mission ..> Ambulance : ambulanceId
+
+note bottom of Point
+  Pas de clé étrangère entre services :
+  chaque service a sa propre base,
+  les liens sont des identifiants
+  (patientId, reservationId, ambulanceId...).
+  Severity et Specialty sont échangées en texte (JSON).
+end note
+
+@enduml

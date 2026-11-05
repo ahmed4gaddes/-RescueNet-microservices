@@ -1,0 +1,63 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1>Tableau de bord</h1>
+      <p>Vue d'ensemble en direct de la plateforme — actualisation automatique.</p>
+    </div>
+    <a class="btn btn-primary" routerLink="/emergency/new">✚ Signaler une urgence</a>
+  </div>
+
+  <section class="grid cols-4" aria-label="Indicateurs">
+    <div class="card kpi" style="--accent: var(--primary)">
+      <span class="label">Missions en cours</span>
+      @if (missions()) { <span class="value">{{ active() }}</span> } @else { <div class="skeleton" style="height:38px;width:60px"></div> }
+      <span class="hint">{{ missions()?.length ?? 0 }} missions au total</span>
+    </div>
+    <div class="card kpi" style="--accent: var(--red)">
+      <span class="label">Cas ROUGE actifs</span>
+      @if (missions()) { <span class="value">{{ red() }}</span> } @else { <div class="skeleton" style="height:38px;width:60px"></div> }
+      <span class="hint">Priorité vitale</span>
+    </div>
+    <div class="card kpi" style="--accent: var(--green)">
+      <span class="label">Ambulances libres</span>
+      @if (ambulances()) { <span class="value">{{ availableAmb() }}<small class="muted"> / {{ ambulances()!.length }}</small></span> } @else { <div class="skeleton" style="height:38px;width:80px"></div> }
+      <span class="hint">Flotte disponible</span>
+    </div>
+    <div class="card kpi" style="--accent: var(--orange)">
+      <span class="label">Lits disponibles</span>
+      @if (hospitals()) { <span class="value">{{ beds().free }}<small class="muted"> / {{ beds().total }}</small></span> } @else { <div class="skeleton" style="height:38px;width:80px"></div> }
+      <span class="hint">{{ hospitals()?.length ?? 0 }} hôpitaux</span>
+    </div>
+  </section>
+
+  <section class="grid split">
+    <div class="card">
+      <div class="card-head"><h2>Carte opérationnelle</h2><span class="badge badge-blue">Temps réel</span></div>
+      <app-map [markers]="markers()" [height]="400" />
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Dernières missions</h2><a routerLink="/missions">Tout voir →</a></div>
+      @if (!missions()) {
+        <div class="skeleton" style="height:200px"></div>
+      } @else if (latest().length === 0) {
+        <div class="empty"><strong>Aucune mission</strong>Signalez une urgence pour démarrer.</div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Heure</th><th>Gravité</th><th>Statut</th></tr></thead>
+            <tbody>
+              @for (m of latest(); track m.missionId) {
+                <tr class="clickable" tabindex="0" (click)="open(m)" (keydown.enter)="open(m)">
+                  <td class="mono">{{ m.createdAt | date: 'HH:mm:ss' }}</td>
+                  <td><app-severity [severity]="m.triage?.severity" /></td>
+                  <td><app-status [status]="m.status" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </section>
+</div>

@@ -1,10 +1,7 @@
 package com.rescuenet.emergency.mission;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -12,13 +9,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
 
 import com.rescuenet.emergency.events.MissionPublisher;
-import com.rescuenet.emergency.remote.RemoteServices;
+import com.rescuenet.emergency.client.FeignRemoteServices;
+import com.rescuenet.emergency.client.dto.DispatchRequest;
+import com.rescuenet.emergency.client.dto.DispatchResponse;
+import com.rescuenet.emergency.client.dto.HospitalMatchRequest;
+import com.rescuenet.emergency.client.dto.HospitalMatchResponse;
+import com.rescuenet.emergency.client.dto.PatientCreateRequest;
+import com.rescuenet.emergency.client.dto.PatientDto;
+import com.rescuenet.emergency.client.dto.TriageRequest;
+import com.rescuenet.emergency.client.dto.TriageResponse;
 import com.rescuenet.emergency.remote.SagaFailure;
 import com.rescuenet.emergency.web.EmergencyRequest;
 import com.rescuenet.emergency.web.MissionView;
+
+import feign.FeignException;
 
 /**
  * Saga orchestrée : patient -> triage IA -> lit d'hôpital -> ambulance.
@@ -32,10 +38,10 @@ public class MissionService {
     private static final Logger log = LoggerFactory.getLogger(MissionService.class);
 
     private final MissionRepository repo;
-    private final RemoteServices remote;
+    private final FeignRemoteServices remote;
     private final MissionPublisher publisher;
 
-    public MissionService(MissionRepository repo, RemoteServices remote, MissionPublisher publisher) {
+    public MissionService(MissionRepository repo, FeignRemoteServices remote, MissionPublisher publisher) {
         this.repo = repo;
         this.remote = remote;
         this.publisher = publisher;
@@ -54,41 +60,38 @@ public class MissionService {
 
         try {
             // 1. Dossier patient (inconnu -> dossier temporaire)
-            Map<String, Object> patient = resolvePatient(req);
-            m.patientId = String.valueOf(patient.get("_id"));
-            List<String> history = strings(patient.get("chronicConditions"));
+            PatientDto patient = resolvePatient(req);
+            m.patientId = patient.id();
+            List<String> history = patient.chronicConditions() == null ? List.of() : patient.chronicConditions();
 
             // 2. Triage par l'IA
-            Map<String, Object> triage = remote.triage(triageBody(req, history));
-            m.severity = String.valueOf(triage.get("severity"));
-            m.score = ((Number) triage.get("score")).doubleValue();
-            m.specialty = String.valueOf(triage.get("specialty"));
-            m.triageExplanation = String.valueOf(triage.get("explanation"));
+            TriageResponse triage = remote.triage(triageBody(req, history));
+            m.severity = triage.severity();
+            m.score = triage.score();
+            m.specialty = triage.specialty();
+            m.triageExplanation = triage.explanation();
             m.status = Mission.Status.TRIAGED;
             save(m);
 
             // 3. Lit dans l'hôpital le plus proche ayant la spécialité
-            Map<String, Object> match = remote.matchHospital(Map.of(
-                    "latitude", m.latitude, "longitude", m.longitude,
-                    "specialty", m.specialty, "severity", m.severity, "missionId", m.id));
-            @SuppressWarnings("unchecked")
-            Map<String, Object> hospital = (Map<String, Object>) match.get("hospital");
-            m.reservationId = String.valueOf(match.get("reservationId"));
-            m.hospitalId = ((Number) hospital.get("id")).intValue();
-            m.hospitalName = String.valueOf(hospital.get("name"));
-            m.hospitalLatitude = ((Number) hospital.get("latitude")).doubleValue();
-            m.hospitalLongitude = ((Number) hospital.get("longitude")).doubleValue();
+            HospitalMatchResponse match = remote.matchHospital(new HospitalMatchRequest(
+                    m.latitude, m.longitude, m.specialty, m.severity, m.id));
+            m.reservationId = match.reservationId();
+            m.hospitalId = match.hospital().id();
+            m.hospitalName = match.hospital().name();
+            m.hospitalLatitude = match.hospital().latitude();
+            m.hospitalLongitude = match.hospital().longitude();
             m.status = Mission.Status.BED_RESERVED;
             save(m);
 
             // 4. Ambulance la plus proche ; en cas d'échec -> compensation (libération du lit)
             try {
-                Map<String, Object> dispatch = remote.assignAmbulance(Map.of(
-                        "missionId", m.id, "severity", m.severity,
-                        "pickup", Map.of("lat", m.latitude, "lng", m.longitude),
-                        "hospital", Map.of("lat", m.hospitalLatitude, "lng", m.hospitalLongitude)));
-                m.ambulanceId = String.valueOf(dispatch.get("ambulanceId"));
-                m.etaMinutes = ((Number) dispatch.get("totalEtaMinutes")).doubleValue();
+                DispatchResponse dispatch = remote.assignAmbulance(new DispatchRequest(
+                        m.id, m.severity,
+                        new DispatchRequest.GeoPoint(m.latitude, m.longitude),
+                        new DispatchRequest.GeoPoint(m.hospitalLatitude, m.hospitalLongitude)));
+                m.ambulanceId = dispatch.ambulanceId();
+                m.etaMinutes = dispatch.totalEtaMinutes();
             } catch (RuntimeException e) {
                 compensateBed(m);
                 throw e;
@@ -145,31 +148,26 @@ public class MissionService {
 
     // --- étapes -------------------------------------------------------------------------------
 
-    private Map<String, Object> resolvePatient(EmergencyRequest req) {
-        if (req.nationalId() != null && !req.nationalId().isBlank()) {
+    private PatientDto resolvePatient(EmergencyRequest req) {
+        boolean hasId = req.nationalId() != null && !req.nationalId().isBlank();
+        if (hasId) {
             var known = remote.findPatientByNationalId(req.nationalId());
             if (known.isPresent()) {
                 return known.get();
             }
         }
-        Map<String, Object> temp = new LinkedHashMap<>();
-        temp.put("temporary", true);
-        temp.put("age", req.age());
-        if (req.nationalId() != null && !req.nationalId().isBlank()) {
-            temp.put("nationalId", req.nationalId());
-        }
-        return remote.createPatient(temp);
+        return remote.createPatient(new PatientCreateRequest(true, req.age(), hasId ? req.nationalId() : null));
     }
 
-    private Map<String, Object> triageBody(EmergencyRequest req, List<String> history) {
+    private TriageRequest triageBody(EmergencyRequest req, List<String> history) {
         var v = req.vitals();
-        Map<String, Object> vitals = new LinkedHashMap<>();
-        vitals.put("heartRate", v != null && v.heartRate() != null ? v.heartRate() : 80);
-        vitals.put("spo2", v != null && v.spo2() != null ? v.spo2() : 98);
-        vitals.put("systolicBP", v != null && v.systolicBP() != null ? v.systolicBP() : 120);
-        vitals.put("consciousness", v != null && v.consciousness() != null ? v.consciousness() : "ALERT");
-        vitals.put("painLevel", v != null && v.painLevel() != null ? v.painLevel() : 0);
-        return Map.of("age", req.age(), "symptoms", req.symptoms(), "vitals", vitals, "medicalHistory", history);
+        var vitals = new TriageRequest.Vitals(
+                v != null && v.heartRate() != null ? v.heartRate() : 80,
+                v != null && v.spo2() != null ? v.spo2() : 98,
+                v != null && v.systolicBP() != null ? v.systolicBP() : 120,
+                v != null && v.consciousness() != null ? v.consciousness() : "ALERT",
+                v != null && v.painLevel() != null ? v.painLevel() : 0);
+        return new TriageRequest(req.age(), req.symptoms(), vitals, history);
     }
 
     private void compensateBed(Mission m) {
@@ -185,9 +183,9 @@ public class MissionService {
         if (e instanceof SagaFailure sf) {
             return sf;
         }
-        if (e instanceof HttpClientErrorException h) {
-            HttpStatus status = h.getStatusCode().value() == 409 ? HttpStatus.CONFLICT : HttpStatus.BAD_GATEWAY;
-            return new SagaFailure(status, "", "Demande refusée : " + h.getResponseBodyAsString(), e);
+        if (e instanceof FeignException.FeignClientException h) {
+            HttpStatus status = h.status() == 409 ? HttpStatus.CONFLICT : HttpStatus.BAD_GATEWAY;
+            return new SagaFailure(status, "", "Demande refusée : " + h.contentUTF8(), e);
         }
         log.error("Erreur inattendue dans la saga", e);
         return new SagaFailure(HttpStatus.INTERNAL_SERVER_ERROR, "", "Erreur interne : " + e.getMessage(), e);
@@ -196,13 +194,5 @@ public class MissionService {
     private void save(Mission m) {
         m.updatedAt = Instant.now();
         repo.save(m);
-    }
-
-    private static List<String> strings(Object value) {
-        List<String> out = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            list.forEach(o -> out.add(String.valueOf(o)));
-        }
-        return out;
     }
 }

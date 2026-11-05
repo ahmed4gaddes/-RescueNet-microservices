@@ -1,10 +1,13 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { Eureka } = require('eureka-js-client');
+const swaggerUi = require('swagger-ui-express');
+const openapi = require('./openapi');
 const routes = require('./routes');
 const { Patient } = require('./models');
 const { startConsumer } = require('./events');
 
+const SERVICE_HOST = process.env.SERVICE_HOST || 'localhost';
 const PORT = parseInt(process.env.PORT || '8082', 10);
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/patients';
 const EUREKA_HOST = process.env.EUREKA_HOST || 'localhost';
@@ -38,6 +41,8 @@ async function main() {
   const app = express();
   app.use(express.json());
   app.get('/health', (_req, res) => res.json({ status: 'UP' }));
+  app.use('/swagger-ui', swaggerUi.serve, swaggerUi.setup(openapi));
+  app.get('/v3/api-docs', (_req, res) => res.json(openapi));
   app.use('/api/patients', routes);
 
   app.listen(PORT, () => {
@@ -47,12 +52,12 @@ async function main() {
       instance: {
         app: 'PATIENT-RECORD-SERVICE',
         instanceId: `patient-record-service:${PORT}`,
-        hostName: 'localhost',
-        ipAddr: '127.0.0.1',
+        hostName: SERVICE_HOST,
+        ipAddr: SERVICE_HOST === 'localhost' ? '127.0.0.1' : SERVICE_HOST,
         port: { $: PORT, '@enabled': true },
         vipAddress: 'patient-record-service',
-        statusPageUrl: `http://127.0.0.1:${PORT}/health`,
-        healthCheckUrl: `http://127.0.0.1:${PORT}/health`,
+        statusPageUrl: `http://${SERVICE_HOST}:${PORT}/health`,
+        healthCheckUrl: `http://${SERVICE_HOST}:${PORT}/health`,
         dataCenterInfo: { '@class': 'com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo', name: 'MyOwn' },
         leaseInfo: { renewalIntervalInSecs: 10, durationInSecs: 30 },
       },

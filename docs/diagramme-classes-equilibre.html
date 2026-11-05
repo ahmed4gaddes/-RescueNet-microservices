@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>RescueNet — Diagramme de classes</title>
+<style>
+  :root {
+    --ink: #1f2430;
+    --muted: #5d6677;
+    --box: #ffffff;
+    --line: #3b4252;
+    --dash: #6b7385;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #ffffff; }
+  body { font-family: "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); }
+
+  #canvas { position: relative; display: inline-block; padding: 26px 34px 22px; background: #fff; }
+  h1 { margin: 0 0 18px; font-size: 22px; letter-spacing: -.01em; text-align: center; }
+  h1 span { color: #d6293e; }
+
+  #layout { display: grid; grid-template-columns: auto auto auto; column-gap: 78px; align-items: center; }
+  .col { display: flex; flex-direction: column; gap: 38px; }
+  #colL, #colR { align-items: stretch; }          /* packages d'une même colonne = même largeur */
+  #colL .grid { justify-content: end; }           /* le contenu se range du côté du package central */
+  #colR .grid { justify-content: start; }
+
+  .pkg { border: 1.6px solid #4b5262; border-radius: 10px; padding: 0 14px 14px; }
+  .pkg > .title { text-align: center; font-weight: 700; font-size: 12.5px; padding: 9px 0 12px; }
+  .grid { display: grid; column-gap: 34px; row-gap: 36px; }
+  #p1 { background: #fff1e0; } #p2 { background: #e8f6ea; } #p3 { background: #e6eef8; }
+  #p4 { background: #f2e9fb; } #p5 { background: #e3f7f9; }
+
+  .cls { background: var(--box); border: 1.2px solid var(--line); border-radius: 5px; font-size: 11.5px; line-height: 15px; align-self: start; overflow: hidden; }
+  .cls .hd { text-align: center; padding: 5px 6px 4px; border-bottom: 1.2px solid var(--line); background: #f3f4f7; }
+  .cls .hd small { display: block; font-style: italic; color: var(--muted); font-size: 10px; line-height: 12px; }
+  .cls .hd b { font-size: 12.5px; }
+  .cls.enum .hd { background: #fbe3dd; }
+  .cls ul { list-style: none; margin: 0; padding: 4px 8px 5px; }
+  .cls li { white-space: nowrap; }
+  .cls li.sep { text-align: center; font-size: 9.5px; color: var(--muted); border-top: 1px solid #c9ced8; margin: 3px -8px 1px; padding-top: 1px; line-height: 12px; }
+  .cls.enum li { padding-left: 4px; }
+
+  svg#links { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+  svg text { font-family: "Segoe UI", Roboto, Arial, sans-serif; fill: var(--muted); font-size: 10.5px; }
+  svg text.ref { fill: #3b4252; font-weight: 600; }
+
+  #legend { display: flex; gap: 26px; justify-content: center; align-items: center; margin-top: 20px; font-size: 11.5px; color: var(--muted); flex-wrap: wrap; }
+  #legend .item { display: flex; align-items: center; gap: 8px; }
+  #note { text-align: center; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="canvas">
+  <h1>Rescue<span>Net</span> — Diagramme de classes</h1>
+
+  <div id="layout">
+    <div class="col" id="colL"><div class="pkg" id="p2"></div><div class="pkg" id="p4"></div></div>
+    <div class="col" id="colM"><div class="pkg" id="p1"></div></div>
+    <div class="col" id="colR"><div class="pkg" id="p3"></div><div class="pkg" id="p5"></div></div>
+  </div>
+
+  <div id="legend">
+    <span class="item"><svg width="38" height="12"><path d="M0 6 L8 1 L16 6 L8 11 Z" fill="#3b4252"/><path d="M16 6 H38" stroke="#3b4252" stroke-width="1.3"/></svg>composition (contient)</span>
+    <span class="item"><svg width="38" height="12"><path d="M0 6 H34" stroke="#3b4252" stroke-width="1.3"/><path d="M28 2 L35 6 L28 10" fill="none" stroke="#3b4252" stroke-width="1.3"/></svg>association (utilise)</span>
+    <span class="item"><svg width="38" height="12"><path d="M0 6 H34" stroke="#6b7385" stroke-width="1.3" stroke-dasharray="4 3"/><path d="M28 2 L35 6 L28 10" fill="none" stroke="#6b7385" stroke-width="1.3"/></svg>référence par identifiant (entre services)</span>
+  </div>
+  <div id="note">Pas de clé étrangère entre services : chaque service a sa propre base de données. Severity et Specialty sont échangées en texte (JSON).</div>
+
+  <svg id="links"></svg>
+</div>
+
+<script>
+/* ---------- Données ---------- */
+const PKG_TITLES = {
+  p1: '1 - emergency-service  (Java · PostgreSQL)',
+  p2: '2 - patient-record-service  (NodeJS · MongoDB)',
+  p3: '3 - triage-ai-service  (Python · MySQL)',
+  p4: '4 - hospital-service  (C# · SQL Server)',
+  p5: '5 - dispatch-service  (Go · Redis)'
+};
+const GRID_COLS = {
+  p1: '92px 160px 150px',
+  p2: '150px 192px',
+  p3: '92px 112px 196px',
+  p4: '132px 192px',
+  p5: '152px 92px 164px'
+};
+
+// pkg, col, row, span (colonnes), stéréotype, nom, attributs
+const C = [
+  // 1 - emergency-service
+  ['p1', 'Location', 1, 1, 1, '«sous-objet»', 'Location', ['+lat : Double', '+lng : Double']],
+  ['p1', 'EmergencyRequest', 2, 1, 1, '«DTO»', 'EmergencyRequest', ['+callerPhone : String', '+nationalId : String', '+symptoms : List<String>', '+age : Integer']],
+  ['p1', 'Vitals', 3, 1, 1, '«sous-objet»', 'Vitals', ['+heartRate : Integer', '+spo2 : Integer', '+systolicBP : Integer', '+consciousness : String', '+painLevel : Integer']],
+  ['p1', 'Mission', 2, 2, 1, '«Entity»', 'Mission', [
+    '+id : String', '+status : MissionStatus', '+callerPhone : String', '+nationalId : String', '+patientId : String',
+    '+age : Integer', '+latitude : double', '+longitude : double', '+symptoms : String',
+    '--triage--', '+severity : String', '+score : Double', '+specialty : String',
+    '--hôpital--', '+hospitalId : Integer', '+hospitalName : String', '+reservationId : String',
+    '--ambulance--', '+ambulanceId : String', '+etaMinutes : Double',
+    '--suivi--', '+failureReason : String', '+createdAt : Instant', '+updatedAt : Instant']],
+  ['p1', 'MissionStatus', 2, 3, 1, 'enum', 'MissionStatus', ['CREATED', 'TRIAGED', 'BED_RESERVED', 'DISPATCHED', 'ON_SCENE', 'TRANSPORTING', 'COMPLETED', 'FAILED']],
+
+  // 2 - patient-record-service
+  ['p2', 'Gender', 1, 1, 1, 'enum', 'Gender', ['M', 'F']],
+  ['p2', 'Patient', 2, 1, 1, '«Document»', 'Patient', ['+_id : ObjectId', '+nationalId : String', '+fullName : String', '+age : Number', '+gender : Gender', '+bloodType : String', '+allergies : String[]', '+chronicConditions : String[]', '+medications : String[]', '+temporary : Boolean']],
+  ['p2', 'Intervention', 1, 2, 1, '«sous-document»', 'Intervention', ['+missionId : String', '+severity : String', '+hospitalName : String', '+symptoms : String[]', '+date : Date']],
+  ['p2', 'Contact', 2, 2, 1, '«sous-document»', 'Contact', ['+name : String', '+phone : String']],
+
+  // 3 - triage-ai-service
+  ['p3', 'TriageRecord', 1, 1, 2, '«Entity»', 'TriageRecord', ['+id : int', '+created_at : datetime', '+severity : Severity', '+score : float', '+specialty : Specialty', '+request : JSON']],
+  ['p3', 'TriageRequest', 3, 1, 1, '«DTO»', 'TriageRequest', ['+age : int', '+symptoms : list[str]', '+medicalHistory : list[str]']],
+  ['p3', 'Severity', 1, 2, 1, 'enum', 'Severity', ['VERT', 'ORANGE', 'ROUGE']],
+  ['p3', 'Specialty', 2, 2, 1, 'enum', 'Specialty', ['CARDIOLOGY', 'NEUROLOGY', 'TRAUMA', 'PULMONOLOGY', 'GENERAL']],
+  ['p3', 'TriageVitals', 3, 2, 1, '«sous-objet»', 'Vitals', ['+heartRate : int', '+spo2 : int', '+systolicBP : int', '+consciousness : Consciousness', '+painLevel : int']],
+  ['p3', 'Consciousness', 3, 3, 1, 'enum', 'Consciousness', ['ALERT', 'VOICE', 'PAIN', 'UNRESPONSIVE']],
+
+  // 4 - hospital-service
+  ['p4', 'Hospital', 2, 1, 1, '«Entity»', 'Hospital', ['+Id : int', '+Name : string', '+City : string', '+Latitude : double', '+Longitude : double', '+Specialties : string', '+TotalBeds : int', '+AvailableBeds : int']],
+  ['p4', 'BedReservation', 2, 2, 1, '«Entity»', 'BedReservation', ['+Id : Guid', '+HospitalId : int', '+MissionId : string', '+Specialty : string', '+Severity : string', '+Status : ReservationStatus', '+CreatedAt : DateTime']],
+  ['p4', 'ReservationStatus', 1, 2, 1, 'enum', 'ReservationStatus', ['RESERVED', 'ADMITTED', 'RELEASED']],
+
+  // 5 - dispatch-service
+  ['p5', 'Ambulance', 1, 1, 1, '«struct»', 'Ambulance', ['+ID : string', '+Plate : string', '+Status : AmbulanceStatus', '+MissionID : string', '+Position : Point']],
+  ['p5', 'DispatchMission', 3, 1, 1, '«struct»', 'DispatchMission', ['+MissionID : string', '+AmbulanceID : string', '+Severity : string', '+Phase : MissionPhase', '+Pickup : Point', '+Hospital : Point']],
+  ['p5', 'AmbulanceStatus', 1, 2, 1, 'enum', 'AmbulanceStatus', ['AVAILABLE', 'ASSIGNED']],
+  ['p5', 'Point', 2, 2, 1, '«sous-objet»', 'Point', ['+Lat : float64', '+Lng : float64']],
+  ['p5', 'MissionPhase', 3, 2, 1, 'enum', 'MissionPhase', ['TO_SCENE', 'ON_SCENE', 'TO_HOSPITAL', 'ARRIVED', 'DONE']]
+];
+
+const attrKey = t => t.replace(/^\+/, '').split(':')[0].trim();
+
+/* ---------- Construction du DOM ---------- */
+for (const id of Object.keys(PKG_TITLES)) {
+  const pkg = document.getElementById(id);
+  pkg.innerHTML = '<div class="title">' + PKG_TITLES[id] + '</div><div class="grid" style="grid-template-columns:' + GRID_COLS[id] + '"></div>';
+}
+for (const [pkg, id, col, row, span, stereo, name, attrs] of C) {
+  const isEnum = stereo === 'enum';
+  const el = document.createElement('div');
+  el.className = 'cls' + (isEnum ? ' enum' : '');
+  el.id = id;
+  el.style.gridColumn = col + ' / span ' + span;
+  el.style.gridRow = String(row);
+  const items = attrs.map(a => a.startsWith('--')
+    ? '<li class="sep">' + a.replace(/-/g, '') + '</li>'
+    : '<li id="' + id + '__' + attrKey(a) + '">' + a.replace(/</g, '&lt;') + '</li>').join('');
+  el.innerHTML = '<div class="hd"><small>' + (isEnum ? '«enumeration»' : stereo) + '</small><b>' + name + '</b></div><ul>' + items + '</ul>';
+  document.querySelector('#' + pkg + ' .grid').appendChild(el);
+}
+
+/* ---------- Flèches ---------- */
+const canvas = document.getElementById('canvas');
+const svg = document.getElementById('links');
+const NS = 'http://www.w3.org/2000/svg';
+
+function box(el) {
+  const c = canvas.getBoundingClientRect(), r = el.getBoundingClientRect();
+  return { l: r.left - c.left, r: r.right - c.left, t: r.top - c.top, b: r.bottom - c.top, w: r.width, h: r.height };
+}
+const E = id => document.getElementById(id);
+
+// ancre : { el, side, y?(px depuis le haut) | alignY?(id) , x?(fraction) | alignX?(id) }
+function anchor(a) {
+  const b = box(E(a.el));
+  const yOf = () => a.alignY ? (box(E(a.alignY)).t + box(E(a.alignY)).b) / 2 : b.t + (a.y ?? b.h / 2);
+  const xOf = () => a.alignX ? (box(E(a.alignX)).l + box(E(a.alignX)).r) / 2 : b.l + (a.x ?? 0.5) * b.w;
+  switch (a.side) {
+    case 'left':   return { x: b.l, y: yOf(), dir: 'h', out: -1 };
+    case 'right':  return { x: b.r, y: yOf(), dir: 'h', out: 1 };
+    case 'top':    return { x: xOf(), y: b.t, dir: 'v', out: -1 };
+    case 'bottom': return { x: xOf(), y: b.b, dir: 'v', out: 1 };
+  }
+}
+// ancre sur une ligne d'attribut (départ des liens entre services)
+function rowAnchor(el, key, side) {
+  const li = E(el + '__' + key), b = box(E(el)), r = box(li);
+  return { x: side === 'left' ? b.l : b.r, y: (r.t + r.b) / 2, dir: 'h', out: side === 'left' ? -1 : 1 };
+}
+
+function pathFor(p, q, o = {}) {
+  if (p.dir === 'h' && q.dir === 'h') {
+    const mx = o.midX ?? (p.x + q.x) / 2;
+    return [[p.x, p.y], [mx, p.y], [mx, q.y], [q.x, q.y]];
+  }
+  if (p.dir === 'v' && q.dir === 'v') {
+    const my = o.midY ?? (p.y + q.y) / 2;
+    return [[p.x, p.y], [p.x, my], [q.x, my], [q.x, q.y]];
+  }
+  if (p.dir === 'h') return [[p.x, p.y], [q.x, p.y], [q.x, q.y]];
+  return [[p.x, p.y], [p.x, q.y], [q.x, q.y]];
+}
+function dedupe(pts) {
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const [x, y] = pts[i], [px, py] = out[out.length - 1];
+    if (Math.abs(x - px) > .5 || Math.abs(y - py) > .5) out.push(pts[i]);
+  }
+  return out;
+}
+function mk(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+
+svg.appendChild(Object.assign(mk('defs', {}), { innerHTML:
+  '<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#3b4252" stroke-width="1.3"/></marker>' +
+  '<marker id="arrowDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#4b5262" stroke-width="1.4"/></marker>' +
+  '<marker id="diamond" viewBox="0 0 14 10" refX="0" refY="5" markerWidth="14" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 5 L7 0.5 L14 5 L7 9.5 Z" fill="#3b4252"/></marker>'
+}));
+
+function label(x, y, text, cls, anchorEnd) {
+  const t = mk('text', { x, y, class: cls || '', 'text-anchor': anchorEnd || 'start' });
+  t.textContent = text; svg.appendChild(t);
+}
+function link(kind, p, q, o = {}) {
+  const pts = dedupe(pathFor(p, q, o));
+  const d = pts.map((pt, i) => (i ? 'L' : 'M') + pt[0].toFixed(1) + ' ' + pt[1].toFixed(1)).join(' ');
+  const attrs = { d, fill: 'none', 'stroke-linejoin': 'round' };
+  if (kind === 'ref') Object.assign(attrs, { stroke: '#4b5262', 'stroke-width': 1.4, 'stroke-dasharray': '5 4', 'marker-end': 'url(#arrowDash)' });
+  else if (kind === 'comp') Object.assign(attrs, { stroke: '#3b4252', 'stroke-width': 1.3, 'marker-start': 'url(#diamond)' });
+  else Object.assign(attrs, { stroke: '#3b4252', 'stroke-width': 1.3, 'marker-end': 'url(#arrow)' });
+  svg.appendChild(mk('path', attrs));
+  return pts;
+}
+
+function drawAll() {
+  svg.querySelectorAll('path:not(marker path), text').forEach(n => n.remove());
+  const A = (el, side, o = {}) => anchor({ el, side, ...o });
+  const hdr = 24; // hauteur de l'en-tête : les flèches latérales visent le nom de la classe
+
+  // ----- emergency-service -----
+  link('comp', A('EmergencyRequest', 'left', { y: 44 }), A('Location', 'right', { y: 44 }));
+  link('comp', A('EmergencyRequest', 'right', { y: 44 }), A('Vitals', 'left', { y: 44 }));
+  link('ref', A('EmergencyRequest', 'bottom'), A('Mission', 'top'));
+  label(box(E('Mission')).l + box(E('Mission')).w / 2 + 6, box(E('Mission')).t - 9, 'crée');
+  link('assoc', A('Mission', 'bottom'), A('MissionStatus', 'top'));
+
+  // ----- patient-record-service -----
+  link('assoc', A('Patient', 'left', { y: hdr }), A('Gender', 'right', { y: hdr }));
+  let pts = link('comp', A('Patient', 'bottom', { alignX: 'Contact' }), A('Contact', 'top'));
+  label(pts[0][0] + 5, pts[0][1] + 14, '1'); label(pts[0][0] + 5, pts[pts.length - 1][1] - 4, '0..1'); label(pts[0][0] + 8, (pts[0][1] + pts[pts.length - 1][1]) / 2 + 3, 'emergencyContact');
+  pts = link('comp', A('Patient', 'bottom', { x: 0.14 }), A('Intervention', 'top'));
+  label(pts[0][0] - 12, pts[0][1] + 14, '1', '', 'end'); label(pts[pts.length - 1][0] + 5, pts[pts.length - 1][1] - 4, '0..*'); label(pts[pts.length - 1][0] + 36, (pts[0][1] + pts[pts.length - 1][1]) / 2 - 2, 'interventions');
+
+  // ----- triage-ai-service -----
+  link('assoc', A('TriageRequest', 'left', { y: hdr }), A('TriageRecord', 'right', { y: hdr }));
+  link('comp', A('TriageRequest', 'bottom'), A('TriageVitals', 'top'));
+  link('assoc', A('TriageRecord', 'bottom', { alignX: 'Severity' }), A('Severity', 'top'));
+  link('assoc', A('TriageRecord', 'bottom', { alignX: 'Specialty' }), A('Specialty', 'top'));
+  link('assoc', A('TriageVitals', 'bottom'), A('Consciousness', 'top'));
+
+  // ----- hospital-service -----
+  pts = link('assoc', A('Hospital', 'bottom'), A('BedReservation', 'top'));
+  label(pts[0][0] + 5, pts[0][1] + 13, '1'); label(pts[0][0] + 5, pts[pts.length - 1][1] - 4, '0..*'); label(pts[0][0] + 34, (pts[0][1] + pts[pts.length - 1][1]) / 2 + 3, 'contient');
+  link('assoc', A('BedReservation', 'left', { y: hdr }), A('ReservationStatus', 'right', { y: hdr }));
+
+  // ----- dispatch-service -----
+  pts = link('assoc', A('DispatchMission', 'left', { y: hdr }), A('Ambulance', 'right', { y: hdr }));
+  label((pts[0][0] + pts[pts.length - 1][0]) / 2, pts[0][1] - 5, 'utilise', '', 'middle');
+  link('assoc', A('Ambulance', 'bottom', { alignX: 'AmbulanceStatus' }), A('AmbulanceStatus', 'top'));
+  link('assoc', A('DispatchMission', 'bottom', { alignX: 'MissionPhase' }), A('MissionPhase', 'top'));
+  link('comp', A('Ambulance', 'bottom', { x: 0.9 }), A('Point', 'top', { x: 0.28 }));
+  link('comp', A('DispatchMission', 'bottom', { x: 0.1 }), A('Point', 'top', { x: 0.72 }));
+
+  // ----- liens entre services (depuis la ligne d'attribut de Mission) -----
+  const p1 = box(E('p1'));
+  const L1 = p1.l - 20, L2 = p1.l - 46, R1 = p1.r + 20, R2 = p1.r + 46;
+  const cross = [
+    // [ligne Mission, côté, cible, ancre cible, midX, texte]
+    ['patientId',     'left',  'Patient',        { y: hdr }, L1, 'patientId'],
+    ['hospitalId',    'left',  'Hospital',       { y: hdr }, L2, 'hospitalId'],
+    ['reservationId', 'left',  'BedReservation', { y: hdr }, L1, 'reservationId'],
+    ['severity',      'right', 'TriageRecord',   { y: hdr }, R1, 'severity, specialty'],
+    ['ambulanceId',   'right', 'Ambulance',      { y: hdr }, R1, 'ambulanceId']
+  ];
+  for (const [key, side, target, o, midX, text] of cross) {
+    const s = rowAnchor('Mission', key, side);
+    const q = anchor({ el: target, side: side === 'left' ? 'right' : 'left', ...o });
+    link('ref', s, q, { midX });
+    const dir = side === 'left' ? -1 : 1;
+    label(s.x + dir * 4, s.y - 4, text, 'ref', side === 'left' ? 'end' : 'start');
+  }
+}
+
+function fit() {
+  const r = canvas.getBoundingClientRect();
+  svg.setAttribute('width', r.width); svg.setAttribute('height', r.height);
+  svg.setAttribute('viewBox', '0 0 ' + r.width + ' ' + r.height);
+  drawAll();
+  document.body.dataset.w = Math.ceil(r.width);
+  document.body.dataset.h = Math.ceil(r.height);
+  const st = document.createElement('style');
+  st.textContent = '@page{size:' + Math.ceil(r.width) + 'px ' + Math.ceil(r.height) + 'px;margin:0}';
+  document.head.appendChild(st);
+}
+window.addEventListener('load', () => setTimeout(() => {
+  try { fit(); } catch (e) { document.body.dataset.err = String(e && e.stack || e); }
+}, 150));
+</script>
+</body>
+</html>

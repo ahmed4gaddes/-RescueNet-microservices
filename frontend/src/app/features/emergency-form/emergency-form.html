@@ -1,0 +1,89 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1>Nouvelle urgence</h1>
+      <p>Saisissez l'appel : la plateforme fait le triage IA, réserve un lit et envoie l'ambulance la plus proche.</p>
+    </div>
+    <button type="button" class="btn" (click)="fillDemo()">Remplir avec la démo</button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="grid split" novalidate>
+    <div class="grid" style="align-content:start">
+      <section class="card grid cols-2">
+        <h2 style="grid-column:1/-1">Appelant et patient</h2>
+        <div class="field">
+          <label for="phone">Téléphone de l'appelant *</label>
+          <input id="phone" class="input" formControlName="callerPhone" placeholder="+216 98 123 456" [class.invalid]="invalid('callerPhone')" autocomplete="off">
+          @if (invalid('callerPhone')) { <span class="error-text">Numéro invalide (8 à 15 chiffres).</span> }
+        </div>
+        <div class="field">
+          <label for="nid">N° CIN (dossier existant)</label>
+          <input id="nid" class="input" formControlName="nationalId" placeholder="12345678" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="age">Âge *</label>
+          <input id="age" type="number" class="input" formControlName="age" [class.invalid]="invalid('age')">
+          @if (invalid('age')) { <span class="error-text">Entre 0 et 120.</span> }
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 style="margin-bottom:12px">Symptômes *</h2>
+        <div class="row" style="margin-bottom:12px">
+          @for (p of presets; track p) {
+            <button type="button" class="btn btn-sm" [class.btn-primary]="symptoms().includes(p)" (click)="togglePreset(p)">{{ p }}</button>
+          }
+        </div>
+        <div class="row">
+          <input class="input" style="flex:1" formControlName="symptomInput" placeholder="Autre symptôme puis Entrée" aria-label="Ajouter un symptôme"
+                 (keydown.enter)="$event.preventDefault(); addSymptom(form.controls.symptomInput.value)">
+          <button type="button" class="btn" (click)="addSymptom(form.controls.symptomInput.value)">Ajouter</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          @for (s of symptoms(); track s) {
+            <span class="chip">{{ s }}<button type="button" (click)="removeSymptom(s)" [attr.aria-label]="'Retirer ' + s">✕</button></span>
+          }
+        </div>
+      </section>
+
+      <section class="card grid cols-2">
+        <h2 style="grid-column:1/-1">Constantes vitales</h2>
+        <div class="field"><label for="hr">Fréquence cardiaque (bpm)</label>
+          <input id="hr" type="number" class="input" formControlName="heartRate" [class.invalid]="invalid('heartRate')"></div>
+        <div class="field"><label for="spo2">SpO₂ (%)</label>
+          <input id="spo2" type="number" class="input" formControlName="spo2" [class.invalid]="invalid('spo2')"></div>
+        <div class="field"><label for="bp">Tension systolique (mmHg)</label>
+          <input id="bp" type="number" class="input" formControlName="systolicBP" [class.invalid]="invalid('systolicBP')"></div>
+        <div class="field"><label for="cons">Conscience</label>
+          <select id="cons" class="input" formControlName="consciousness">
+            <option value="ALERT">Alerte</option><option value="VOICE">Répond à la voix</option>
+            <option value="PAIN">Répond à la douleur</option><option value="UNRESPONSIVE">Inconscient</option>
+          </select></div>
+        <div class="field" style="grid-column:1/-1">
+          <label for="pain">Douleur : {{ form.controls.painLevel.value }} / 10</label>
+          <input id="pain" type="range" min="0" max="10" formControlName="painLevel">
+        </div>
+      </section>
+    </div>
+
+    <div class="grid" style="align-content:start">
+      <section class="card">
+        <div class="card-head"><h2>Lieu de l'urgence *</h2>
+          <button type="button" class="btn btn-sm" (click)="useMyPosition()">Ma position</button></div>
+        <app-map [markers]="markers()" [height]="300" />
+        <div class="grid cols-2" style="margin-top:12px">
+          <div class="field"><label for="lat">Latitude</label>
+            <input id="lat" type="number" step="0.0001" class="input" formControlName="lat" (input)="syncLocation()" [class.invalid]="invalid('lat')"></div>
+          <div class="field"><label for="lng">Longitude</label>
+            <input id="lng" type="number" step="0.0001" class="input" formControlName="lng" (input)="syncLocation()" [class.invalid]="invalid('lng')"></div>
+        </div>
+      </section>
+
+      @if (failure()) { <div class="alert alert-error" role="alert">{{ failure() }}</div> }
+
+      <button class="btn btn-danger" style="min-height:52px;font-size:1.05rem" [disabled]="submitting()">
+        {{ submitting() ? 'Traitement en cours…' : '🚑 Lancer le dispatch' }}
+      </button>
+    </div>
+  </form>
+</div>

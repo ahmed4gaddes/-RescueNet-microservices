@@ -14,6 +14,7 @@ public class EurekaRegistration(IConfiguration config, ILogger<EurekaRegistratio
     private readonly string _eureka = (config["Eureka:Url"] ?? "http://localhost:8761/eureka").TrimEnd('/');
     private readonly string _app = "HOSPITAL-SERVICE";
     private readonly int _port = config.GetValue("Port", 8084);
+    private readonly string _host = config["ServiceHost"] ?? "localhost";
     private string InstanceId => $"hospital-service:{_port}";
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -51,16 +52,16 @@ public class EurekaRegistration(IConfiguration config, ILogger<EurekaRegistratio
             instance = new Dictionary<string, object>
             {
                 ["instanceId"] = InstanceId,
-                ["hostName"] = "localhost",
+                ["hostName"] = _host,
                 ["app"] = _app,
-                ["ipAddr"] = "127.0.0.1",
+                ["ipAddr"] = _host == "localhost" ? "127.0.0.1" : _host,
                 ["vipAddress"] = "hospital-service",
                 ["status"] = "UP",
                 ["port"] = new Dictionary<string, object> { ["$"] = _port, ["@enabled"] = "true" },
                 ["securePort"] = new Dictionary<string, object> { ["$"] = 443, ["@enabled"] = "false" },
-                ["healthCheckUrl"] = $"http://127.0.0.1:{_port}/health",
-                ["statusPageUrl"] = $"http://127.0.0.1:{_port}/health",
-                ["homePageUrl"] = $"http://127.0.0.1:{_port}/",
+                ["healthCheckUrl"] = $"http://{_host}:{_port}/health",
+                ["statusPageUrl"] = $"http://{_host}:{_port}/health",
+                ["homePageUrl"] = $"http://{_host}:{_port}/",
                 ["dataCenterInfo"] = new Dictionary<string, object>
                 {
                     ["@class"] = "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",

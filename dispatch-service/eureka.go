@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -28,16 +29,25 @@ func NewEurekaClient(baseURL, app string, port int) *EurekaClient {
 	}
 }
 
+// advertised : hôte annoncé à Eureka. SERVICE_HOST (nom du conteneur) en Docker ; localhost en local.
+func advertised() (host, ip string) {
+	if h := os.Getenv("SERVICE_HOST"); h != "" {
+		return h, h
+	}
+	return "localhost", "127.0.0.1"
+}
+
 func (e *EurekaClient) register() error {
 	p := fmt.Sprint(e.port)
+	host, ip := advertised()
 	payload := map[string]any{"instance": map[string]any{
-		"instanceId": e.instanceID, "hostName": "localhost", "app": e.app, "ipAddr": "127.0.0.1",
+		"instanceId": e.instanceID, "hostName": host, "app": e.app, "ipAddr": ip,
 		"vipAddress": strings.ToLower(e.app), "status": "UP",
 		"port":           map[string]any{"$": e.port, "@enabled": "true"},
 		"securePort":     map[string]any{"$": 443, "@enabled": "false"},
-		"healthCheckUrl": "http://127.0.0.1:" + p + "/health",
-		"statusPageUrl":  "http://127.0.0.1:" + p + "/health",
-		"homePageUrl":    "http://127.0.0.1:" + p + "/",
+		"healthCheckUrl": "http://" + ip + ":" + p + "/health",
+		"statusPageUrl":  "http://" + ip + ":" + p + "/health",
+		"homePageUrl":    "http://" + ip + ":" + p + "/",
 		"dataCenterInfo": map[string]any{"@class": "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo", "name": "MyOwn"},
 		"leaseInfo":      map[string]any{"renewalIntervalInSecs": 10, "durationInSecs": 30},
 	}}

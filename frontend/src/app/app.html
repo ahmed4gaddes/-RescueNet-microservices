@@ -1,0 +1,45 @@
+<a class="skip" href="#main">Aller au contenu</a>
+
+<header class="topbar">
+  <button class="btn btn-ghost btn-sm burger" (click)="menuOpen.set(!menuOpen())" aria-label="Ouvrir le menu" [attr.aria-expanded]="menuOpen()">☰</button>
+  <span class="brand-mini">RescueNet</span>
+</header>
+
+<aside class="sidebar" [class.open]="menuOpen()">
+  <a class="brand" routerLink="/" (click)="menuOpen.set(false)">
+    <span class="logo" aria-hidden="true">✚</span>
+    <span><strong>RescueNet</strong><small>Dispatch d'urgence</small></span>
+  </a>
+
+  <nav aria-label="Navigation principale">
+    @for (item of nav(); track item.path) {
+      <a class="nav-link" [routerLink]="item.path" routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: !!item.exact }" (click)="menuOpen.set(false)">
+        <span class="ico" aria-hidden="true">{{ item.icon }}</span>{{ item.label }}
+      </a>
+    }
+  </nav>
+
+  <div class="side-foot">
+    <div class="user">
+      <span class="avatar" aria-hidden="true">{{ auth.name().charAt(0).toUpperCase() }}</span>
+      <span class="who"><strong>{{ auth.name() }}</strong><small>{{ auth.label() }}</small></span>
+    </div>
+    <a class="btn btn-primary" routerLink="/emergency/new" (click)="menuOpen.set(false)">✚ Signaler une urgence</a>
+    <button class="btn btn-ghost btn-sm" (click)="toggleTheme()">◐ Changer de thème</button>
+    @if (auth.isAdmin()) { <a class="muted small" href="http://localhost:8761" target="_blank" rel="noopener">Eureka ↗</a> }
+    <button class="btn btn-ghost btn-sm" (click)="auth.logout()">⎋ Se déconnecter</button>
+  </div>
+</aside>
+@if (menuOpen()) { <div class="scrim" (click)="menuOpen.set(false)"></div> }
+
+<main id="main" class="content"><router-outlet /></main>
+
+<div class="toasts" aria-live="polite">
+  @for (t of toast.toasts(); track t.id) {
+    <div class="toast" [class]="'toast ' + t.kind" role="status">
+      <span>{{ t.text }}</span>
+      <button (click)="toast.dismiss(t.id)" aria-label="Fermer">✕</button>
+    </div>
+  }
+</div>

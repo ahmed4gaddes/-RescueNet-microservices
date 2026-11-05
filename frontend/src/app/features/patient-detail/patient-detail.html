@@ -1,0 +1,77 @@
+<div class="page">
+  <a routerLink="/patients" class="muted">← Patients</a>
+
+  @if (notFound()) {
+    <div class="card empty"><strong>Dossier introuvable</strong>Ce patient n'existe pas.</div>
+  } @else if (!patient()) {
+    <div class="skeleton" style="height:300px"></div>
+  } @else {
+    @let p = patient()!;
+    <div class="page-head">
+      <div>
+        <h1>{{ p.fullName }}</h1>
+        <p>CIN {{ p.nationalId ?? '—' }} · {{ p.age ?? '?' }} ans
+          @if (p.temporary) { · <span class="badge badge-orange">Dossier temporaire</span> }</p>
+      </div>
+      @if (!editing() && auth.isAdmin()) { <button class="btn" (click)="editing.set(true)">Modifier le dossier</button> }
+    </div>
+
+    <section class="grid split">
+      <div class="card">
+        @if (editing()) {
+          <form [formGroup]="form" (ngSubmit)="save()" class="grid cols-2">
+            <div class="field"><label for="fn">Nom complet</label><input id="fn" class="input" formControlName="fullName"></div>
+            <div class="field"><label for="ag">Âge</label><input id="ag" type="number" class="input" formControlName="age"></div>
+            <div class="field"><label for="ge">Sexe</label>
+              <select id="ge" class="input" formControlName="gender"><option value="M">Homme</option><option value="F">Femme</option><option value="UNKNOWN">Inconnu</option></select></div>
+            <div class="field"><label for="bt">Groupe sanguin</label>
+              <select id="bt" class="input" formControlName="bloodType">
+                @for (b of ['UNKNOWN','A+','A-','B+','B-','AB+','AB-','O+','O-']; track b) { <option [value]="b">{{ b }}</option> }
+              </select></div>
+            <div class="field" style="grid-column:1/-1"><label for="al">Allergies (séparées par des virgules)</label><input id="al" class="input" formControlName="allergies"></div>
+            <div class="field" style="grid-column:1/-1"><label for="cc">Maladies chroniques</label><input id="cc" class="input" formControlName="chronicConditions" placeholder="hypertension, diabète"></div>
+            <div class="field" style="grid-column:1/-1"><label for="me">Traitements</label><input id="me" class="input" formControlName="medications"></div>
+            <div class="field"><label for="cn">Contact d'urgence</label><input id="cn" class="input" formControlName="contactName"></div>
+            <div class="field"><label for="cp">Téléphone</label><input id="cp" class="input" formControlName="contactPhone"></div>
+            <div class="row" style="grid-column:1/-1">
+              <button class="btn btn-primary" [disabled]="saving()">{{ saving() ? 'Enregistrement…' : 'Enregistrer' }}</button>
+              <button type="button" class="btn btn-ghost" (click)="editing.set(false)">Annuler</button>
+            </div>
+          </form>
+        } @else {
+          <h2 style="margin-bottom:14px">Informations médicales</h2>
+          <dl class="grid cols-2" style="margin:0">
+            <div><dt class="label-text">Sexe</dt><dd style="margin:0">{{ p.gender ?? '—' }}</dd></div>
+            <div><dt class="label-text">Groupe sanguin</dt><dd style="margin:0">{{ p.bloodType ?? '—' }}</dd></div>
+            <div style="grid-column:1/-1"><dt class="label-text">Allergies</dt>
+              <dd class="row" style="margin:6px 0 0">@for (a of p.allergies ?? []; track a) { <span class="chip">{{ a }}</span> } @empty { <span class="muted">Aucune connue</span> }</dd></div>
+            <div style="grid-column:1/-1"><dt class="label-text">Maladies chroniques</dt>
+              <dd class="row" style="margin:6px 0 0">@for (a of p.chronicConditions ?? []; track a) { <span class="chip">{{ a }}</span> } @empty { <span class="muted">Aucune</span> }</dd></div>
+            <div style="grid-column:1/-1"><dt class="label-text">Traitements</dt>
+              <dd class="row" style="margin:6px 0 0">@for (a of p.medications ?? []; track a) { <span class="chip">{{ a }}</span> } @empty { <span class="muted">Aucun</span> }</dd></div>
+            <div style="grid-column:1/-1"><dt class="label-text">Contact d'urgence</dt>
+              <dd style="margin:6px 0 0">{{ p.emergencyContact?.name || '—' }} {{ p.emergencyContact?.phone }}</dd></div>
+          </dl>
+        }
+      </div>
+
+      <div class="card">
+        <h2 style="margin-bottom:14px">Historique des interventions</h2>
+        @if (!p.interventions?.length) {
+          <div class="empty"><strong>Aucune intervention</strong>Elles sont ajoutées automatiquement en fin de mission.</div>
+        } @else {
+          <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px">
+            @for (i of reversed(p); track i.missionId) {
+              <li style="border-left:3px solid var(--primary);padding-left:12px">
+                <div class="row"><app-severity [severity]="i.severity" /><span class="mono muted">{{ i.date | date: 'dd/MM/yyyy HH:mm' }}</span></div>
+                <p style="margin-top:4px"><strong>{{ i.hospitalName }}</strong></p>
+                <p class="muted">{{ i.symptoms.join(', ') }}</p>
+                <a [routerLink]="['/emergency', i.missionId]" class="mono">mission {{ i.missionId.slice(0, 8) }}</a>
+              </li>
+            }
+          </ol>
+        }
+      </div>
+    </section>
+  }
+</div>

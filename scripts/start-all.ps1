@@ -1,4 +1,4 @@
-# Démarre toute la plateforme RescueNet : Docker (bases + RabbitMQ), Eureka, Gateway, puis les modules.
+﻿# Démarre toute la plateforme RescueNet : Docker (bases + RabbitMQ), Eureka, Gateway, puis les modules.
 # Usage :  powershell -ExecutionPolicy Bypass -File scripts\start-all.ps1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -32,17 +32,20 @@ function Start-Svc($name, $file, $argList, $workDir) {
 Remove-Item (Join-Path $logs 'pids.txt') -ErrorAction SilentlyContinue
 
 Write-Host '1/4 Docker Desktop'
-& docker info *> $null
-if ($LASTEXITCODE -ne 0) {
+function Test-Docker {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { docker info *> $null; return ($LASTEXITCODE -eq 0) } catch { return $false } finally { $ErrorActionPreference = $old }
+}
+if (-not (Test-Docker)) {
     Start-Process 'C:\Program Files\Docker\Docker\Docker Desktop.exe'
-    Wait-Until 'moteur Docker' { docker info *> $null; $LASTEXITCODE -eq 0 } 240
+    Wait-Until 'moteur Docker' { Test-Docker } 240
 }
 
-Write-Host '2/4 Infrastructure (PostgreSQL, MongoDB, MySQL, SQL Server, Redis, RabbitMQ)'
+Write-Host '2/4 Infrastructure (PostgreSQL, MongoDB, MySQL, SQL Server, Redis, RabbitMQ, Keycloak)'
 docker compose -f (Join-Path $root 'docker-compose.infra.yml') up -d
 Wait-Until 'conteneurs healthy' {
     $s = docker ps --filter 'name=rescuenet' --format '{{.Status}}'
-    ($s.Count -ge 6) -and -not ($s | Where-Object { $_ -notmatch 'healthy' })
+    ($s.Count -ge 7) -and -not ($s | Where-Object { $_ -notmatch 'healthy' })
 } 300
 
 Write-Host '3/4 Eureka + Gateway'
@@ -58,5 +61,20 @@ Start-Svc 'dispatch' "$root\dispatch-service\dispatch-service.exe" @() "$root\di
 $emergencyJar = "$root\emergency-service\target\emergency-service-0.0.1-SNAPSHOT.jar"
 if (Test-Path $emergencyJar) { Start-Svc 'emergency' $java @('-Xmx300m', '-jar', $emergencyJar) $root }
 
-Write-Host "`nTout est lancé. Eureka : http://localhost:8761  |  Gateway : http://localhost:8080  |  RabbitMQ : http://localhost:15672 (rescue/rescue123)"
+# Frontend Angular (http://localhost:4200) : npm install au premier lancement, puis ng serve
+$front = Join-Path $root 'frontend'
+if (Test-Path $front) {
+    if (Get-NetTCPConnection -LocalPort 4200 -State Listen -ErrorAction SilentlyContinue) {
+        Write-Host '  OK  frontend déjà en cours sur :4200'
+    } else {
+        if (-not (Test-Path (Join-Path $front 'node_modules'))) {
+            Write-Host '  >>  npm install (frontend, première fois)'
+            Push-Location $front; npm install; Pop-Location
+        }
+        $ng = Join-Path $front 'node_modules\@angular\cli\bin\ng.js'
+        Start-Svc 'frontend' 'node' @($ng, 'serve', '--port', '4200') $front
+    }
+}
+
+Write-Host "`nTout est lancé. Eureka : http://localhost:8761  |  Gateway : http://localhost:8080  |  Frontend : http://localhost:4200  |  RabbitMQ : http://localhost:15672 (rescue/rescue123)  |  Keycloak : http://localhost:8180"
 Write-Host 'Les services apparaissent dans Eureka sous 30-60 s. Arrêt : scripts\stop-all.ps1'

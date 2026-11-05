@@ -18,6 +18,7 @@ log = logging.getLogger("triage-ai")
 logging.basicConfig(level=logging.INFO)
 
 PORT = int(os.getenv("PORT", "8083"))
+SERVICE_HOST = os.getenv("SERVICE_HOST", "localhost")
 EUREKA_URL = os.getenv("EUREKA_URL", "http://localhost:8761/eureka/")
 DB_URL = os.getenv("MYSQL_URL", "mysql+pymysql://rescue:rescue123@localhost:3306/triage_db")
 MODEL_PATH = Path(__file__).resolve().parent.parent / "triage_model.joblib"
@@ -69,9 +70,9 @@ async def lifespan(_: FastAPI):
         eureka_server=EUREKA_URL,
         app_name="triage-ai-service",
         instance_port=PORT,
-        instance_host="localhost",
-        instance_ip="127.0.0.1",
-        health_check_url=f"http://127.0.0.1:{PORT}/health",
+        instance_host=SERVICE_HOST,
+        instance_ip="127.0.0.1" if SERVICE_HOST == "localhost" else SERVICE_HOST,
+        health_check_url=f"http://{SERVICE_HOST}:{PORT}/health",
         renewal_interval_in_secs=10,
         duration_in_secs=30,
     )

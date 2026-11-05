@@ -1,0 +1,107 @@
+{
+  "realm": "rescuenet",
+  "displayName": "RescueNet",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 3600,
+  "roles": {
+    "realm": [
+      {
+        "name": "OPERATEUR",
+        "description": "Opérateur du centre d'appels : crée et suit les urgences"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrateur : accès complet, triage IA, modification des dossiers"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "rescuenet-frontend",
+      "name": "RescueNet Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "rootUrl": "http://localhost:4200",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:4200/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "email",
+        "roles"
+      ]
+    },
+    {
+      "clientId": "rescuenet-cli",
+      "name": "RescueNet CLI (tests curl, dev uniquement)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect",
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "email",
+        "roles"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "operateur",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Sami",
+      "lastName": "Operateur",
+      "email": "operateur@rescuenet.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "operateur123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "OPERATEUR"
+      ]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Amel",
+      "lastName": "Admin",
+      "email": "admin@rescuenet.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMIN",
+        "OPERATEUR"
+      ]
+    }
+  ]
+}

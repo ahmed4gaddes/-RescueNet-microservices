@@ -8,6 +8,12 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 builder.Services.AddDbContext<HospitalDb>(o => o.UseSqlServer(
     builder.Configuration.GetConnectionString("Hospital")
     ?? "Server=localhost,1433;Database=hospital_db;User Id=sa;Password=Rescue_123!;TrustServerCertificate=True"));
+builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, _, _) =>
+{
+    doc.Info.Title = "Hospital Service";
+    doc.Info.Description = "Hôpitaux, lits et réservations (C# / .NET 10 / SQL Server).";
+    return Task.CompletedTask;
+}));
 builder.Services.AddHostedService<EurekaRegistration>();
 builder.Services.AddHostedService<EventConsumer>();
 
@@ -16,9 +22,20 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
     await HospitalDb.InitializeAsync(scope.ServiceProvider.GetRequiredService<HospitalDb>(), app.Logger);
 
-app.MapGet("/health", () => new { status = "UP" });
+app.MapGet("/health", () => new { status = "UP" }).WithTags("Technique");
 
-app.MapGet("/api/hospitals", async (HospitalDb db) => await db.Hospitals.AsNoTracking().OrderBy(h => h.Id).ToListAsync());
+// Documentation : JSON OpenAPI + interface Swagger UI
+app.MapOpenApi("/v3/api-docs");
+app.MapGet("/swagger-ui", () => Results.Content("""
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Hospital Service - Swagger</title>
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css"></head>
+<body><div id="ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({ url: '/v3/api-docs', dom_id: '#ui' });</script></body></html>
+""", "text/html")).ExcludeFromDescription();
+
+app.MapGet("/api/hospitals", async (HospitalDb db) => await db.Hospitals.AsNoTracking().OrderBy(h => h.Id).ToListAsync())
+    .WithTags("Hôpitaux").WithSummary("Liste des hôpitaux et lits disponibles");
 
 app.MapGet("/api/hospitals/{id:int}", async (int id, HospitalDb db) =>
     await db.Hospitals.FindAsync(id) is { } h ? Results.Ok(h) : Results.NotFound(new { error = "Hôpital introuvable" }));

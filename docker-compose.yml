@@ -1,0 +1,120 @@
+name: rescuenet
+
+# Plateforme RescueNet complète en conteneurs :  docker compose up -d --build
+# (bases, RabbitMQ, Keycloak : voir docker-compose.infra.yml, inclus ci-dessous)
+#
+# Accès : frontend http://localhost:4200 | gateway http://localhost:8080 | Eureka http://localhost:8761
+#         Keycloak http://localhost:8180 | RabbitMQ http://localhost:15672
+#
+# Dans le réseau Docker les services se joignent par leur NOM (ex. http://discovery-server:8761) :
+# la variable SERVICE_HOST / EUREKA_INSTANCE_HOSTNAME dit à Eureka sous quel nom les appeler.
+
+include:
+  - docker-compose.infra.yml
+
+x-java-eureka: &java-eureka
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+  EUREKA_INSTANCE_PREFERIPADDRESS: "false"
+
+services:
+  discovery-server:
+    build: ./discovery-server
+    container_name: rescuenet-discovery
+    ports: ["8761:8761"]
+    restart: unless-stopped
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: rescuenet-gateway
+    ports: ["8080:8080"]
+    environment:
+      <<: *java-eureka
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
+      # Les jetons sont émis pour le navigateur (localhost:8180) ; les clés publiques se lisent via le réseau Docker
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI: http://localhost:8180/realms/rescuenet
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://keycloak:8180/realms/rescuenet/protocol/openid-connect/certs
+    depends_on:
+      discovery-server: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    restart: unless-stopped
+
+  emergency-service:
+    build: ./emergency-service
+    container_name: rescuenet-emergency
+    ports: ["8081:8081"]
+    environment:
+      <<: *java-eureka
+      EUREKA_INSTANCE_HOSTNAME: emergency-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-emergency:5432/emergency_db
+      SPRING_RABBITMQ_HOST: rabbitmq
+    depends_on:
+      discovery-server: { condition: service_healthy }
+      postgres-emergency: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  patient-record-service:
+    build: ./patient-record-service
+    container_name: rescuenet-patient
+    ports: ["8082:8082"]
+    environment:
+      SERVICE_HOST: patient-record-service
+      EUREKA_HOST: discovery-server
+      MONGO_URL: mongodb://mongo-patients:27017/patients
+      RABBIT_URL: amqp://rescue:rescue123@rabbitmq:5672
+    depends_on:
+      discovery-server: { condition: service_healthy }
+      mongo-patients: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  triage-ai-service:
+    build: ./triage-ai-service
+    container_name: rescuenet-triage
+    ports: ["8083:8083"]
+    environment:
+      SERVICE_HOST: triage-ai-service
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      MYSQL_URL: mysql+pymysql://rescue:rescue123@mysql-triage:3306/triage_db
+    depends_on:
+      discovery-server: { condition: service_healthy }
+      mysql-triage: { condition: service_healthy }
+    restart: unless-stopped
+
+  hospital-service:
+    build: ./hospital-service
+    container_name: rescuenet-hospital
+    ports: ["8084:8084"]
+    environment:
+      ServiceHost: hospital-service
+      Eureka__Url: http://discovery-server:8761/eureka
+      RabbitMq__Url: amqp://rescue:rescue123@rabbitmq:5672
+      ConnectionStrings__Hospital: Server=sqlserver-hospital,1433;Database=hospital_db;User Id=sa;Password=Rescue_123!;TrustServerCertificate=True
+    depends_on:
+      discovery-server: { condition: service_healthy }
+      sqlserver-hospital: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  dispatch-service:
+    build: ./dispatch-service
+    container_name: rescuenet-dispatch
+    ports: ["8085:8085"]
+    environment:
+      SERVICE_HOST: dispatch-service
+      EUREKA_URL: http://discovery-server:8761/eureka
+      REDIS_ADDR: redis-dispatch:6379
+      RABBIT_URL: amqp://rescue:rescue123@rabbitmq:5672/
+    depends_on:
+      discovery-server: { condition: service_healthy }
+      redis-dispatch: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: rescuenet-frontend
+    # Port 4200 imposé : c'est l'URL de redirection autorisée dans Keycloak
+    ports: ["4200:80"]
+    depends_on: [api-gateway]
+    restart: unless-stopped

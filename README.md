@@ -59,6 +59,33 @@ l'intervention est ajoutée au dossier du patient (patient-record).
 Test de résilience : arrêter `dispatch-service`, relancer l'urgence → `503` explicite (« Service indispensable
 indisponible : DISPATCH-SERVICE »), mission `FAILED`, et le lit déjà réservé est **libéré** (compensation de la saga).
 
+## Lancer avec Docker (tout en conteneurs)
+```powershell
+docker compose up -d --build          # construit les 8 images et démarre toute la plateforme
+docker compose ps                     # état des conteneurs
+docker compose logs -f emergency-service
+docker compose down                   # arrêt (ajouter -v pour supprimer aussi les données)
+```
+Un `Dockerfile` par service (build multi-étapes), `docker-compose.yml` pour les applications et `docker-compose.infra.yml` (inclus) pour les bases, RabbitMQ et Keycloak.
+Accès : frontend http://localhost:4200, Gateway http://localhost:8080, Eureka http://localhost:8761, Keycloak http://localhost:8180.
+Ne pas lancer `scripts\start-all.ps1` en même temps (mêmes ports). Il faut environ 5 Go de RAM alloués à Docker.
+
+Deux modes : **Docker** (ci-dessus) ou **développement** (`docker-compose.infra.yml` + `scripts\start-all.ps1`, services en processus locaux).
+Les services s'annoncent à Eureka sous leur nom de conteneur grâce à `SERVICE_HOST` (par défaut `localhost` en mode local).
+
+## Documentation
+| Document | Contenu |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | diagrammes d'architecture, de séquence (saga), de déploiement et de sécurité |
+| [`docs/API.md`](docs/API.md) | routes, rôles, Swagger UI de chaque service, événements RabbitMQ |
+| [`docs/JUSTIFICATION-ARCHITECTURE.md`](docs/JUSTIFICATION-ARCHITECTURE.md) | monolithe / SOA / microservices, limites, choix d'outils |
+| [`docs/VEILLE-OBSERVABILITE.md`](docs/VEILLE-OBSERVABILITE.md) | équivalents d'Actuator pour Node.js et Python |
+| [`docs/PLANNING-REPARTITION.md`](docs/PLANNING-REPARTITION.md) | répartition de l'équipe, planning, scénario de démo |
+| [`docs/postman/`](docs/postman) | collection Postman + environnement |
+
+## Frontend (Angular)
+`frontend/` : Angular 22, connexion Keycloak (PKCE), écrans tableau de bord, nouvelle urgence, suivi de mission sur carte, missions, patients, hôpitaux, ambulances, triage IA (admin). En développement : `cd frontend ; npx ng serve` (lancé par `start-all.ps1`).
+
 ## Architecture et couplage faible
 - **Une base par service**, moteurs différents ; aucun accès croisé.
 - **Aucune URL en dur** : `emergency-service` appelle `http://TRIAGE-AI-SERVICE/...` etc. via Eureka + LoadBalancer.
@@ -83,3 +110,25 @@ indisponible : DISPATCH-SERVICE »), mission `FAILED`, et le lit déjà réserv�
 - La saga n'a pas d'outbox transactionnelle : si RabbitMQ tombe pendant la publication de `mission.completed`,
   le message est retenté 3 fois puis abandonné.
 - Mémoire : SQL Server (~2 Go) + 3 JVM limitées + 4 autres services : fermer les applications lourdes pendant la démo.
+
+## Sécurité (Keycloak + JWT)
+- **Keycloak** (Docker, http://localhost:8180, console `admin` / `admin123`) émet les JWT du realm `rescuenet` (importé depuis `keycloak/rescuenet-realm.json`).
+- **API Gateway** = resource server : sans jeton `401`, rôle insuffisant `403`. Les services internes ne sont joignables que via la Gateway en usage normal.
+- **Frontend Angular** : connexion Keycloak (code + PKCE) via `keycloak-js`, jeton ajouté par `auth.interceptor.ts`, menus et routes filtrés par rôle.
+
+| Compte | Mot de passe | Rôle |
+|---|---|---|
+| `operateur` | `operateur123` | OPERATEUR |
+| `admin` | `admin123` | ADMIN (+ OPERATEUR) |
+
+| Action | OPERATEUR | ADMIN |
+|---|---|---|
+| Créer / suivre une urgence, voir patients, hôpitaux, ambulances | oui | oui |
+| Modifier un dossier patient, historique du triage IA, actuator | non | oui |
+
+Test en ligne de commande (client `rescuenet-cli`, dev uniquement) :
+```powershell
+$t = (Invoke-RestMethod -Method Post http://localhost:8180/realms/rescuenet/protocol/openid-connect/token -Body @{client_id='rescuenet-cli';username='operateur';password='operateur123';grant_type='password'}).access_token
+Invoke-RestMethod http://localhost:8080/api/hospitals -Headers @{Authorization="Bearer $t"}
+```
+Les mots de passe ci-dessus sont des comptes de démonstration : à changer hors démo. Pour réimporter le realm, supprimer le volume `rescuenet_rescuenet_keycloak_data`.

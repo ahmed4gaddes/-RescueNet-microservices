@@ -9,3 +9,6 @@ logs/
 .idea/
 *.exe
 .vscode/
+
+# Documents personnels (non versionnés)
+RESUME.md

@@ -100,7 +100,33 @@ services:
       timeout: 10s
       retries: 10
 
+  # Serveur d'identité : emet les JWT (realm "rescuenet", rôles OPERATEUR / ADMIN).
+  # Console : http://localhost:8180  (admin / admin123) ; le realm est importé au démarrage.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: rescuenet-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin123
+      KC_HTTP_PORT: "8180"
+      KC_HEALTH_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: "-Xms256m -Xmx512m"
+    ports:
+      - "8180:8180"
+      - "9000:9000"
+    volumes:
+      - ./keycloak/rescuenet-realm.json:/opt/keycloak/data/import/rescuenet-realm.json:ro
+      - rescuenet_keycloak_data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 40s
+
 volumes:
+  rescuenet_keycloak_data:
   rescuenet_postgres_data:
   rescuenet_mongo_data:
   rescuenet_mysql_data:

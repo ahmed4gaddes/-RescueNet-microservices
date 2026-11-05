@@ -1,0 +1,78 @@
+<div class="page">
+  <a routerLink="/missions" class="muted">← Missions</a>
+
+  @if (notFound()) {
+    <div class="card empty"><strong>Mission introuvable</strong>Cet identifiant n'existe pas.</div>
+  } @else if (!mission()) {
+    <div class="skeleton" style="height:90px"></div>
+    <div class="skeleton" style="height:420px"></div>
+  } @else {
+    @let m = mission()!;
+    <div class="page-head">
+      <div>
+        <h1>Suivi de mission</h1>
+        <p class="mono">{{ m.missionId }} · ouverte à {{ m.createdAt | date: 'HH:mm:ss' }}</p>
+      </div>
+      <div class="row">
+        <app-severity [severity]="m.triage?.severity" />
+        <app-status [status]="m.status" />
+        @if (!final()) { <span class="muted">● actualisation en direct</span> }
+      </div>
+    </div>
+
+    @if (m.status === 'FAILED') {
+      <div class="alert alert-error" role="alert"><strong>Mission en échec.</strong> {{ m.failureReason }}</div>
+    } @else {
+      <section class="card"><app-stepper [status]="m.status" /></section>
+    }
+    @if (m.status === 'COMPLETED') {
+      <div class="alert alert-success">✔ Patient admis à {{ m.hospital?.name }}. Le lit est confirmé et l'ambulance est de nouveau disponible.</div>
+    }
+
+    <section class="grid split">
+      <div class="card">
+        <div class="card-head"><h2>Carte</h2>
+          @if (live(); as l) { <span class="badge badge-orange">{{ phaseLabel() }}</span> }
+        </div>
+        <app-map [markers]="markers()" [route]="route()" [height]="430" />
+        @if (live(); as l) {
+          <div class="row" style="margin-top:12px">
+            <span class="chip">Distance restante : <strong class="mono">{{ l.remainingKm | number: '1.1-1' }} km</strong></span>
+            <span class="chip">ETA : <strong class="mono">{{ l.etaMinutes | number: '1.0-1' }} min</strong></span>
+          </div>
+        }
+      </div>
+
+      <div class="grid" style="align-content:start">
+        @if (m.triage; as t) {
+          <section class="card">
+            <div class="card-head"><h2>Triage IA</h2><app-severity [severity]="t.severity" /></div>
+            <div class="row" style="margin-bottom:10px">
+              <span style="font-size:2rem;font-weight:750;font-variant-numeric:tabular-nums">{{ t.score | number: '1.0-0' }}</span>
+              <span class="muted">/ 100 · {{ specialty[t.specialty] ?? t.specialty }}</span>
+            </div>
+            <p class="muted">{{ t.explanation }}</p>
+          </section>
+        }
+        @if (m.hospital; as h) {
+          <section class="card">
+            <h2 style="margin-bottom:8px">Hôpital</h2>
+            <p><strong>{{ h.name }}</strong></p>
+            <p class="muted mono">Réservation {{ h.reservationId.slice(0, 8) }}</p>
+          </section>
+        }
+        @if (m.ambulance; as a) {
+          <section class="card">
+            <h2 style="margin-bottom:8px">Ambulance</h2>
+            <p><strong>{{ a.id }}</strong> · arrivée estimée {{ a.etaMinutes | number: '1.0-1' }} min</p>
+          </section>
+        }
+        <section class="card">
+          <h2 style="margin-bottom:10px">Symptômes</h2>
+          <div class="row">@for (s of m.symptoms; track s) { <span class="chip">{{ s }}</span> }</div>
+          @if (m.patientId) { <p style="margin-top:12px"><a [routerLink]="['/patients', m.patientId]">Voir le dossier patient →</a></p> }
+        </section>
+      </div>
+    </section>
+  }
+</div>

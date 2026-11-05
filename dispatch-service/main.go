@@ -73,6 +73,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery(), gin.Logger())
 	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "UP"}) })
+	registerDocs(r)
 
 	r.GET("/api/dispatch/ambulances", func(c *gin.Context) {
 		list, err := store.allAmbulances(c)
