@@ -80,8 +80,12 @@ Les services s'annoncent à Eureka sous leur nom de conteneur grâce à `SERVICE
 | [`docs/API.md`](docs/API.md) | routes, rôles, Swagger UI de chaque service, événements RabbitMQ |
 | [`docs/JUSTIFICATION-ARCHITECTURE.md`](docs/JUSTIFICATION-ARCHITECTURE.md) | monolithe / SOA / microservices, limites, choix d'outils |
 | [`docs/VEILLE-OBSERVABILITE.md`](docs/VEILLE-OBSERVABILITE.md) | équivalents d'Actuator pour Node.js et Python |
+| [`docs/SCENARIO-DEMO.md`](docs/SCENARIO-DEMO.md) | démarrage pas à pas et scénario de démonstration par rôle |
 | [`docs/PLANNING-REPARTITION.md`](docs/PLANNING-REPARTITION.md) | répartition de l'équipe, planning, scénario de démo |
 | [`docs/postman/`](docs/postman) | collection Postman + environnement |
+
+## Libération des lits
+`hospital-service` fait sortir automatiquement les patients admis depuis plus de 3 minutes (`Hospital__StayMinutes`) : le lit est rendu à l'hôpital (statut `DISCHARGED`).
 
 ## Frontend (Angular)
 `frontend/` : Angular 22, connexion Keycloak (PKCE), écrans tableau de bord, nouvelle urgence, suivi de mission sur carte, missions, patients, hôpitaux, ambulances, triage IA (admin). En développement : `cd frontend ; npx ng serve` (lancé par `start-all.ps1`).

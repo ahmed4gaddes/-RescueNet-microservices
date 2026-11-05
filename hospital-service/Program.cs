@@ -16,6 +16,7 @@ builder.Services.AddOpenApi(o => o.AddDocumentTransformer((doc, _, _) =>
 }));
 builder.Services.AddHostedService<EurekaRegistration>();
 builder.Services.AddHostedService<EventConsumer>();
+builder.Services.AddHostedService<DischargeService>();
 
 var app = builder.Build();
 

@@ -87,6 +87,8 @@ services:
     ports: ["8084:8084"]
     environment:
       ServiceHost: hospital-service
+      # Durée d'hospitalisation avant la sortie automatique du patient (le lit est alors libéré)
+      Hospital__StayMinutes: "3"
       Eureka__Url: http://discovery-server:8761/eureka
       RabbitMq__Url: amqp://rescue:rescue123@rabbitmq:5672
       ConnectionStrings__Hospital: Server=sqlserver-hospital,1433;Database=hospital_db;User Id=sa;Password=Rescue_123!;TrustServerCertificate=True

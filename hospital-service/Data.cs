@@ -25,7 +25,7 @@ public class BedReservation
     public string MissionId { get; set; } = "";
     public string Specialty { get; set; } = "";
     public string Severity { get; set; } = "";
-    /// <summary>RESERVED | ADMITTED | RELEASED</summary>
+    /// <summary>RESERVED | ADMITTED | DISCHARGED | RELEASED</summary>
     public string Status { get; set; } = "RESERVED";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
