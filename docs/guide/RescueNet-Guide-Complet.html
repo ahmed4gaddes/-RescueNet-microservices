@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>RescueNet — Guide complet du projet</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font: 10.5pt/1.5 "Segoe UI", Arial, sans-serif; color: #172033; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; color: #0b2a5b; }
+  h2 { font-size: 15pt; color: #fff; background: #0b2a5b; padding: 6pt 10pt; border-radius: 4pt; margin: 22pt 0 10pt; page-break-after: avoid; }
+  h3 { font-size: 12pt; color: #0b2a5b; margin: 14pt 0 5pt; border-bottom: 1.5pt solid #cfd9ec; padding-bottom: 2pt; page-break-after: avoid; }
+  h4 { font-size: 10.5pt; margin: 10pt 0 3pt; color: #1d4ed8; page-break-after: avoid; }
+  p { margin: 4pt 0 6pt; }
+  ul, ol { margin: 3pt 0 8pt 18pt; padding: 0; }
+  li { margin: 2pt 0; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 9pt; background: #eef2fa; padding: 1pt 3pt; border-radius: 3pt; color: #0b2a5b; }
+  pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 8.6pt; background: #0f1b33; color: #e6eefc; padding: 8pt 10pt; border-radius: 5pt; overflow: hidden; white-space: pre-wrap; word-break: break-word; margin: 6pt 0 10pt; page-break-inside: avoid; }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9.4pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th { background: #dfe8f8; color: #0b2a5b; text-align: left; padding: 4pt 6pt; border: 0.6pt solid #b9c7e2; }
+  td { padding: 4pt 6pt; border: 0.6pt solid #cdd7ea; vertical-align: top; }
+  tr:nth-child(even) td { background: #f6f8fd; }
+  .cover { text-align: center; padding-top: 70mm; page-break-after: always; }
+  .cover h1 { font-size: 34pt; }
+  .cover .sub { font-size: 15pt; color: #3b4a68; margin-top: 8pt; }
+  .cover .meta { margin-top: 40pt; color: #5d6b86; font-size: 10pt; }
+  .logo { display: inline-block; width: 70pt; height: 70pt; border-radius: 16pt; background: #dc2626; color: #fff; font-size: 52pt; line-height: 70pt; font-weight: 800; margin-bottom: 14pt; }
+  .toc { page-break-after: always; }
+  .toc li { margin: 3pt 0; font-size: 11pt; }
+  .note { border-left: 4pt solid #2563eb; background: #eef4ff; padding: 6pt 10pt; margin: 8pt 0; border-radius: 0 4pt 4pt 0; page-break-inside: avoid; }
+  .warn { border-left-color: #d97706; background: #fff6e6; }
+  .ok { border-left-color: #16a34a; background: #ecf9f0; }
+  .path { font-family: Consolas, monospace; font-size: 8.8pt; color: #1d4ed8; }
+  .small { font-size: 9pt; color: #5d6b86; }
+  .pb { page-break-before: always; }
+  svg { display: block; margin: 8pt auto; max-width: 100%; }
+  .two { display: flex; gap: 12pt; } .two > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ============================ COUVERTURE ============================ -->
+<section class="cover">
+  <div class="logo">✚</div>
+  <h1>RescueNet</h1>
+  <div class="sub">Guide complet du projet<br>Architecture microservices — Eureka, Gateway, OpenFeign, RabbitMQ, Keycloak, Docker</div>
+  <div class="meta">
+    Dispatch intelligent des urgences médicales<br>
+    Module « Applications Web Distribuées » — 4ᵉ année<br><br>
+    Dépôt : github.com/ahmed4gaddes/-RescueNet-microservices
+  </div>
+</section>
+
+<!-- ============================ SOMMAIRE ============================ -->
+<section class="toc">
+  <h1>Sommaire</h1>
+  <ol>
+    <li>Vue d'ensemble du projet</li>
+    <li>Tous les ports disponibles</li>
+    <li>Les serveurs et leur rôle</li>
+    <li>Eureka — le Discovery Server</li>
+    <li>L'API Gateway</li>
+    <li>OpenFeign — appels entre microservices</li>
+    <li>Le point oublié : ce qui existe seulement en Java, sans port ni URL</li>
+    <li>Keycloak — authentification et JWT</li>
+    <li>Les rôles OPERATEUR et ADMIN</li>
+    <li>Les bases de données de chaque service</li>
+    <li>RabbitMQ — communication asynchrone</li>
+    <li>Swagger et OpenAPI</li>
+    <li>Docker : pourquoi une image par service</li>
+    <li>Docker Compose : pourquoi dans les microservices</li>
+    <li>Cloner et lancer le projet (pour vos amis)</li>
+    <li>Pousser le travail sur GitHub</li>
+    <li>Annexe : commandes utiles et dépannage</li>
+  </ol>
+  <div class="note">Les chemins de fichiers sont donnés à partir de la racine du projet (<code>G:\project2</code>). Les numéros de ligne correspondent à la version du dépôt au moment de la rédaction : ils peuvent légèrement bouger si le code évolue.</div>
+</section>
+
+<!-- ============================ 1. VUE D'ENSEMBLE ============================ -->
+<h2>1. Vue d'ensemble du projet</h2>
+<p><b>RescueNet</b> coordonne une urgence médicale. Un opérateur du centre d'appels saisit l'appel ; la plateforme enchaîne automatiquement : <b>dossier du patient → triage par intelligence artificielle → réservation d'un lit dans l'hôpital le plus proche → envoi de l'ambulance la plus proche</b>, avec un suivi GPS simulé jusqu'à l'hôpital.</p>
+<p>Le projet est une architecture <b>microservices polyglotte</b> : chaque service a son langage, sa base de données et son image Docker.</p>
+
+<svg viewBox="0 0 720 360" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial" font-size="12">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#475569"/></marker></defs>
+  <rect x="10" y="150" width="90" height="46" rx="8" fill="#e0e7ff" stroke="#6366f1"/><text x="55" y="171" text-anchor="middle" font-weight="700">Navigateur</text><text x="55" y="187" text-anchor="middle" font-size="10">opérateur / admin</text>
+  <rect x="125" y="150" width="95" height="46" rx="8" fill="#dbeafe" stroke="#2563eb"/><text x="172" y="171" text-anchor="middle" font-weight="700">Frontend</text><text x="172" y="187" text-anchor="middle" font-size="10">Angular :4200</text>
+  <rect x="125" y="40" width="95" height="46" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="172" y="61" text-anchor="middle" font-weight="700">Keycloak</text><text x="172" y="77" text-anchor="middle" font-size="10">JWT :8180</text>
+  <rect x="250" y="150" width="105" height="46" rx="8" fill="#dcfce7" stroke="#16a34a"/><text x="302" y="171" text-anchor="middle" font-weight="700">API Gateway</text><text x="302" y="187" text-anchor="middle" font-size="10">:8080</text>
+  <rect x="250" y="270" width="105" height="46" rx="8" fill="#fae8ff" stroke="#a21caf"/><text x="302" y="291" text-anchor="middle" font-weight="700">Eureka</text><text x="302" y="307" text-anchor="middle" font-size="10">annuaire :8761</text>
+  <rect x="395" y="30" width="130" height="44" rx="8" fill="#e0f2fe" stroke="#0284c7"/><text x="460" y="50" text-anchor="middle" font-weight="700">emergency (Java)</text><text x="460" y="65" text-anchor="middle" font-size="10">:8081 — PostgreSQL</text>
+  <rect x="395" y="95" width="130" height="44" rx="8" fill="#e0f2fe" stroke="#0284c7"/><text x="460" y="115" text-anchor="middle" font-weight="700">patient-record (Node)</text><text x="460" y="130" text-anchor="middle" font-size="10">:8082 — MongoDB</text>
+  <rect x="395" y="160" width="130" height="44" rx="8" fill="#e0f2fe" stroke="#0284c7"/><text x="460" y="180" text-anchor="middle" font-weight="700">triage-ai (Python)</text><text x="460" y="195" text-anchor="middle" font-size="10">:8083 — MySQL</text>
+  <rect x="395" y="225" width="130" height="44" rx="8" fill="#e0f2fe" stroke="#0284c7"/><text x="460" y="245" text-anchor="middle" font-weight="700">hospital (C#)</text><text x="460" y="260" text-anchor="middle" font-size="10">:8084 — SQL Server</text>
+  <rect x="395" y="290" width="130" height="44" rx="8" fill="#e0f2fe" stroke="#0284c7"/><text x="460" y="310" text-anchor="middle" font-weight="700">dispatch (Go)</text><text x="460" y="325" text-anchor="middle" font-size="10">:8085 — Redis</text>
+  <rect x="580" y="150" width="125" height="56" rx="8" fill="#ffe4e6" stroke="#e11d48"/><text x="642" y="173" text-anchor="middle" font-weight="700">RabbitMQ</text><text x="642" y="189" text-anchor="middle" font-size="10">événements :5672</text>
+  <g stroke="#475569" fill="none" stroke-width="1.4" marker-end="url(#a)">
+    <path d="M100,173 L125,173"/><path d="M172,150 L172,86"/><path d="M220,173 L250,173"/>
+    <path d="M355,165 L395,55"/><path d="M355,170 L395,117"/><path d="M355,175 L395,182"/><path d="M355,182 L395,247"/><path d="M355,188 L395,310"/>
+    <path d="M302,270 L302,196" stroke-dasharray="4 3"/>
+    <path d="M525,60 L580,160" stroke="#e11d48"/><path d="M525,312 L580,200" stroke="#e11d48"/>
+  </g>
+  <text x="195" y="120" font-size="10" fill="#475569">connexion</text>
+  <text x="528" y="250" font-size="10" fill="#e11d48">événements</text>
+</svg>
+<p class="small">Flèches grises : appels HTTP. Flèche pointillée : enregistrement des services dans Eureka. Flèches rouges : messages RabbitMQ. <code>emergency-service</code> appelle aussi les 4 autres services avec OpenFeign (section 6).</p>
+
+<h3>Le déroulement d'une urgence</h3>
+<ol>
+  <li>L'opérateur remplit le formulaire (écran « Nouvelle urgence » du frontend).</li>
+  <li>Le frontend envoie <code>POST /api/emergencies</code> avec un jeton JWT à l'API Gateway.</li>
+  <li>La Gateway vérifie le jeton et le rôle, trouve <code>EMERGENCY-SERVICE</code> dans Eureka et lui transmet la requête.</li>
+  <li><code>emergency-service</code> orchestre (<b>saga</b>) : patient → triage → lit → ambulance, en appelant les autres services avec OpenFeign.</li>
+  <li>Si l'ambulance est indisponible : le lit déjà réservé est libéré (<b>compensation</b>) et la réponse est un 503 clair.</li>
+  <li>Le trajet de l'ambulance est simulé par <code>dispatch-service</code> qui publie des événements dans RabbitMQ ; à la fin, l'hôpital admet le patient, le dossier reçoit l'intervention et l'ambulance redevient libre.</li>
+</ol>
+
+<!-- ============================ 2. PORTS ============================ -->
+<h2>2. Tous les ports disponibles</h2>
+<h3>Applications</h3>
+<table>
+  <tr><th>Port (hôte)</th><th>Composant</th><th>Usage</th></tr>
+  <tr><td><b>4200</b></td><td>Frontend Angular</td><td>Interface web — <b>http://localhost:4200</b></td></tr>
+  <tr><td><b>8080</b></td><td>API Gateway</td><td>Point d'entrée de toutes les API (JWT obligatoire)</td></tr>
+  <tr><td><b>8081</b></td><td>emergency-service (Java)</td><td>Orchestration des urgences · Swagger <code>/swagger-ui.html</code></td></tr>
+  <tr><td><b>8082</b></td><td>patient-record-service (Node.js)</td><td>Dossiers médicaux · Swagger <code>/swagger-ui</code></td></tr>
+  <tr><td><b>8083</b></td><td>triage-ai-service (Python)</td><td>Triage par IA · Swagger <code>/docs</code></td></tr>
+  <tr><td><b>8084</b></td><td>hospital-service (C#)</td><td>Hôpitaux et lits · Swagger <code>/swagger-ui</code></td></tr>
+  <tr><td><b>8085</b></td><td>dispatch-service (Go)</td><td>Ambulances et GPS · Swagger <code>/swagger-ui</code></td></tr>
+  <tr><td><b>8761</b></td><td>Eureka (discovery-server)</td><td>Annuaire — <b>http://localhost:8761</b></td></tr>
+  <tr><td><b>8180</b></td><td>Keycloak</td><td>Authentification — <b>http://localhost:8180</b> (console <code>admin</code> / <code>admin123</code>)</td></tr>
+  <tr><td>9000</td><td>Keycloak (management)</td><td>Sonde de santé interne (<code>/health/ready</code>)</td></tr>
+</table>
+<h3>Infrastructure (bases de données et messagerie)</h3>
+<table>
+  <tr><th>Port (hôte)</th><th>Composant</th><th>Utilisé par</th><th>Identifiants</th></tr>
+  <tr><td><b>5433</b> (5432 dans le conteneur)</td><td>PostgreSQL</td><td>emergency-service</td><td><code>rescue</code> / <code>rescue123</code>, base <code>emergency_db</code></td></tr>
+  <tr><td><b>27017</b></td><td>MongoDB</td><td>patient-record-service</td><td>sans mot de passe, base <code>patients</code></td></tr>
+  <tr><td><b>3306</b></td><td>MySQL</td><td>triage-ai-service</td><td><code>rescue</code> / <code>rescue123</code>, base <code>triage_db</code></td></tr>
+  <tr><td><b>1433</b></td><td>SQL Server</td><td>hospital-service</td><td><code>sa</code> / <code>Rescue_123!</code>, base <code>hospital_db</code></td></tr>
+  <tr><td><b>6379</b></td><td>Redis</td><td>dispatch-service</td><td>sans mot de passe</td></tr>
+  <tr><td><b>5672</b></td><td>RabbitMQ (AMQP)</td><td>messages entre services</td><td><code>rescue</code> / <code>rescue123</code></td></tr>
+  <tr><td><b>15672</b></td><td>RabbitMQ (console web)</td><td>supervision</td><td><code>rescue</code> / <code>rescue123</code></td></tr>
+</table>
+<div class="note">PostgreSQL est publié sur <b>5433</b> car un PostgreSQL installé sur la machine occupe souvent le port 5432. Dans le réseau Docker, les services se parlent par <b>nom</b> (ex. <code>postgres-emergency:5432</code>) : les ports de l'hôte ne servent qu'à y accéder depuis votre machine.</div>
+<p><b>Où sont définis ces ports ?</b> Applications : <span class="path">docker-compose.yml</span> (sections <code>ports</code>) et <code>application.properties</code> ou le code de chaque service. Infrastructure : <span class="path">docker-compose.infra.yml</span>.</p>
+
+<!-- ============================ 3. SERVEURS ============================ -->
+<h2>3. Les serveurs et leur rôle</h2>
+<table>
+  <tr><th>Serveur / service</th><th>Technologie</th><th>Rôle dans le projet</th><th>Dossier</th></tr>
+  <tr><td><b>discovery-server</b></td><td>Java, Spring Cloud Netflix Eureka</td><td>Annuaire : chaque service s'y enregistre ; les autres le trouvent par son nom.</td><td class="path">discovery-server/</td></tr>
+  <tr><td><b>api-gateway</b></td><td>Java, Spring Cloud Gateway</td><td>Entrée unique, routage, vérification JWT et des rôles, CORS.</td><td class="path">api-gateway/</td></tr>
+  <tr><td><b>emergency-service</b></td><td>Java 21, Spring Boot, OpenFeign</td><td>Chef d'orchestre : crée la mission et enchaîne patient, triage, lit, ambulance (saga avec compensation). Écoute les événements RabbitMQ.</td><td class="path">emergency-service/</td></tr>
+  <tr><td><b>patient-record-service</b></td><td>Node.js, Express</td><td>Dossiers médicaux (allergies, maladies chroniques, historique des interventions).</td><td class="path">patient-record-service/</td></tr>
+  <tr><td><b>triage-ai-service</b></td><td>Python, FastAPI, scikit-learn</td><td>Modèle d'IA (RandomForest) : gravité ROUGE / ORANGE / VERT et spécialité requise.</td><td class="path">triage-ai-service/</td></tr>
+  <tr><td><b>hospital-service</b></td><td>C#, .NET 10</td><td>Hôpitaux, lits, réservations ; choisit l'hôpital le plus proche ayant la spécialité ; sortie automatique des patients après 3 minutes.</td><td class="path">hospital-service/</td></tr>
+  <tr><td><b>dispatch-service</b></td><td>Go, Gin</td><td>Flotte d'ambulances : la plus proche (Redis GEOSEARCH) et simulation du trajet GPS.</td><td class="path">dispatch-service/</td></tr>
+  <tr><td><b>frontend</b></td><td>Angular 22, Leaflet</td><td>Interface : tableau de bord, formulaire d'urgence, suivi sur carte, patients, hôpitaux, ambulances, triage.</td><td class="path">frontend/</td></tr>
+  <tr><td><b>Keycloak</b></td><td>Docker (image officielle)</td><td>Serveur d'identité : connexion, comptes, rôles, émission des JWT.</td><td class="path">keycloak/, docker-compose.infra.yml</td></tr>
+  <tr><td><b>RabbitMQ</b></td><td>Docker (image officielle)</td><td>Messagerie asynchrone entre services.</td><td class="path">docker-compose.infra.yml</td></tr>
+  <tr><td><b>Bases de données</b></td><td>PostgreSQL, MongoDB, MySQL, SQL Server, Redis</td><td>Une base par service.</td><td class="path">docker-compose.infra.yml</td></tr>
+</table>
+
+<!-- ============================ 4. EUREKA ============================ -->
+<h2>4. Eureka — le Discovery Server</h2>
+<h3>Rôle</h3>
+<p>Eureka est l'<b>annuaire</b> des services. Au démarrage, chaque service dit à Eureka « je suis <i>TRIAGE-AI-SERVICE</i>, joignable à telle adresse », puis envoie un signal de vie (heartbeat) toutes les 10 secondes. Quand un service veut en appeler un autre, il demande à Eureka l'adresse à partir du <b>nom</b>. Résultat : <b>aucune URL ni port n'est écrit en dur</b> pour joindre un autre service, et un service arrêté disparaît de l'annuaire au bout de 30 secondes.</p>
+<h3>Emplacement dans le code</h3>
+<table>
+  <tr><th>Élément</th><th>Fichier</th><th>Ce qu'il contient</th></tr>
+  <tr><td>Le serveur Eureka</td><td class="path">discovery-server/src/main/java/com/rescuenet/discoveryserver/DiscoveryServerApplication.java</td><td>Ligne 7 : annotation <code>@EnableEurekaServer</code></td></tr>
+  <tr><td>Configuration du serveur</td><td class="path">discovery-server/src/main/resources/application.properties</td><td><code>server.port=8761</code> ; il ne s'enregistre pas lui-même (lignes 6-7)</td></tr>
+  <tr><td>Dépendance</td><td class="path">discovery-server/pom.xml</td><td>ligne 40 : <code>spring-cloud-starter-netflix-eureka-server</code></td></tr>
+  <tr><td>Client Java (gateway, emergency)</td><td class="path">emergency-service/src/main/resources/application.properties</td><td>ligne 22 : <code>eureka.client.service-url.defaultZone=http://localhost:8761/eureka/</code></td></tr>
+  <tr><td>Client Node.js</td><td class="path">patient-record-service/src/server.js</td><td>ligne 51 : bibliothèque <code>eureka-js-client</code></td></tr>
+  <tr><td>Client Python</td><td class="path">triage-ai-service/app/main.py</td><td>ligne 69 : <code>py-eureka-client</code> (<code>eureka_client.init_async</code>)</td></tr>
+  <tr><td>Client C#</td><td class="path">hospital-service/EurekaRegistration.cs</td><td>client REST écrit à la main : register, heartbeat 10 s, deregister</td></tr>
+  <tr><td>Client Go</td><td class="path">dispatch-service/eureka.go</td><td>client REST écrit à la main (même principe)</td></tr>
+</table>
+<div class="note">En Docker, chaque service s'annonce à Eureka sous son <b>nom de conteneur</b> grâce à la variable <code>SERVICE_HOST</code> (ou <code>EUREKA_INSTANCE_HOSTNAME</code> pour Java), définie dans <span class="path">docker-compose.yml</span>. En local, elle vaut <code>localhost</code> par défaut.</div>
+<h3>Comment le vérifier</h3>
+<p>Ouvrir <b>http://localhost:8761</b>. La section « Instances currently registered with Eureka » doit lister 6 applications en <b>UP</b> : API-GATEWAY, EMERGENCY-SERVICE, PATIENT-RECORD-SERVICE, TRIAGE-AI-SERVICE, HOSPITAL-SERVICE, DISPATCH-SERVICE.</p>
+
+<!-- ============================ 5. GATEWAY ============================ -->
+<h2>5. L'API Gateway</h2>
+<h3>Rôle</h3>
+<p>La Gateway est la <b>porte d'entrée unique</b> du système. Le frontend ne connaît qu'une adresse (<code>http://localhost:8080</code>) ; la Gateway :</p>
+<ul>
+  <li><b>route</b> chaque requête vers le bon service (<code>/api/emergencies/**</code> → emergency-service, etc.) en utilisant Eureka (<code>lb://NOM-DU-SERVICE</code>) ;</li>
+  <li><b>sécurise</b> : elle vérifie le jeton JWT et le rôle avant de transmettre (401 sans jeton, 403 si le rôle est insuffisant) ;</li>
+  <li>gère le <b>CORS</b> (autorise le frontend sur le port 4200) ;</li>
+  <li><b>répartit la charge</b> si plusieurs instances d'un service existent.</li>
+</ul>
+<h3>Emplacement dans le code</h3>
+<table>
+  <tr><th>Élément</th><th>Fichier</th><th>Détail</th></tr>
+  <tr><td>Application</td><td class="path">api-gateway/src/main/java/com/rescuenet/apigateway/ApiGatewayApplication.java</td><td>classe de démarrage Spring Boot</td></tr>
+  <tr><td>Routes</td><td class="path">api-gateway/src/main/resources/application.properties</td><td>lignes 15-35 : 5 routes <code>lb://EMERGENCY-SERVICE</code>, <code>PATIENT-RECORD-SERVICE</code>, <code>TRIAGE-AI-SERVICE</code>, <code>HOSPITAL-SERVICE</code>, <code>DISPATCH-SERVICE</code></td></tr>
+  <tr><td>Sécurité (JWT, rôles, CORS)</td><td class="path">api-gateway/src/main/java/com/rescuenet/apigateway/SecurityConfig.java</td><td>règles <code>pathMatchers</code> aux lignes 45-54 ; lecture des rôles Keycloak (<code>realm_access.roles</code>)</td></tr>
+  <tr><td>Adresse de Keycloak</td><td class="path">api-gateway/src/main/resources/application.properties</td><td>lignes 38-39 : <code>issuer-uri</code> et <code>jwk-set-uri</code></td></tr>
+  <tr><td>Dépendances</td><td class="path">api-gateway/pom.xml</td><td>ligne 40 : <code>spring-cloud-starter-gateway-server-webflux</code> ; ligne 44 : <code>spring-boot-starter-oauth2-resource-server</code></td></tr>
+</table>
+<h3>Les routes</h3>
+<table>
+  <tr><th>Chemin appelé</th><th>Service ciblé</th></tr>
+  <tr><td><code>/api/emergencies/**</code></td><td>EMERGENCY-SERVICE</td></tr>
+  <tr><td><code>/api/patients/**</code></td><td>PATIENT-RECORD-SERVICE</td></tr>
+  <tr><td><code>/api/triage/**</code></td><td>TRIAGE-AI-SERVICE</td></tr>
+  <tr><td><code>/api/hospitals/**</code></td><td>HOSPITAL-SERVICE</td></tr>
+  <tr><td><code>/api/dispatch/**</code></td><td>DISPATCH-SERVICE</td></tr>
+</table>
+<p class="small">Vocabulaire : « API server » désigne ici l'<b>API Gateway</b>, le serveur frontal par lequel passent toutes les requêtes. Si vous pensiez à l'annuaire des services, c'est le <b>Discovery Server (Eureka)</b> décrit en section 4.</p>
+
+<!-- ============================ 6. OPENFEIGN ============================ -->
+<h2>6. OpenFeign — appels entre microservices</h2>
+<h3>Rôle</h3>
+<p>OpenFeign permet à <code>emergency-service</code> d'appeler les autres services en déclarant une simple <b>interface Java</b>. On n'écrit ni URL, ni port, ni code HTTP : on écrit le <b>nom Eureka</b> du service et la signature de la méthode. La réponse JSON est convertie automatiquement en objet Java (<b>DTO</b>).</p>
+<pre><code>@FeignClient(name = "TRIAGE-AI-SERVICE", contextId = "triageClient")   // nom Eureka : aucune URL
+public interface TriageClient {
+    @PostMapping("/api/triage")
+    TriageResponse triage(@RequestBody TriageRequest body);          // JSON &lt;-&gt; objets Java
+}</code></pre>
+<h3>Emplacement dans le code (tout dans emergency-service)</h3>
+<table>
+  <tr><th>Élément</th><th>Fichier</th></tr>
+  <tr><td>Activation</td><td class="path">emergency-service/src/main/java/com/rescuenet/emergency/EmergencyServiceApplication.java — ligne 8 : <code>@EnableFeignClients</code></td></tr>
+  <tr><td>Les 4 clients</td><td class="path">emergency-service/src/main/java/com/rescuenet/emergency/client/ : <code>PatientClient</code>, <code>TriageClient</code>, <code>HospitalClient</code>, <code>DispatchClient</code></td></tr>
+  <tr><td>Les DTO (7 objets)</td><td class="path">emergency-service/src/main/java/com/rescuenet/emergency/client/dto/</td></tr>
+  <tr><td>Façade avec résilience</td><td class="path">…/client/FeignRemoteServices.java — ligne 28 (classe), ligne 82 (méthode <code>call</code> : une nouvelle tentative, puis erreur 503)</td></tr>
+  <tr><td>Utilisation (la saga)</td><td class="path">…/mission/MissionService.java — lignes 68 (triage), 77 (lit), 89 (ambulance), 159 (patient)</td></tr>
+  <tr><td>Timeouts</td><td class="path">emergency-service/src/main/resources/application.properties — lignes 32-34 (2 s de connexion, 6 s de lecture)</td></tr>
+  <tr><td>Dépendance</td><td class="path">emergency-service/pom.xml — ligne 60 : <code>spring-cloud-starter-openfeign</code></td></tr>
+</table>
+<div class="note ok"><b>Ce que cela apporte :</b> couplage faible (aucune adresse en dur), code court et lisible, DTO typés, intégration à Eureka et à la répartition de charge. <b>Limite :</b> OpenFeign n'existe qu'en Java ; les autres langages (Node, Python, C#, Go) utilisent leur propre client HTTP.</div>
+
+<!-- ============================ 7. CHOSE OUBLIEE ============================ -->
+<h2>7. Le point oublié : ce qui existe seulement en Java, sans port ni URL</h2>
+<div class="note warn"><b>À confirmer :</b> vous avez écrit que vous ne retrouvez plus le nom d'une chose « qui se fait seulement en Java et qui n'a pas de port ni d'URL ». Je n'ai pas pu deviner avec certitude ; voici les deux candidats les plus probables, tous deux présents dans le projet. Si c'est autre chose, dites-le-moi et j'ajoute la section.</div>
+
+<h3>Candidat 1 — le client OpenFeign (« client déclaratif »)</h3>
+<p>C'est exactement la phrase de votre atelier : <i>« Déclarer un client OpenFeign et appeler un microservice par son nom Eureka, sans URL ni port écrits en dur. »</i> Il n'existe qu'en Java (Spring Cloud) ; il n'a ni port ni URL, seulement un <b>nom</b> (<code>name = "TRIAGE-AI-SERVICE"</code>). Voir section 6.</p>
+
+<h3>Candidat 2 — Spring Cloud LoadBalancer (répartiteur de charge côté client)</h3>
+<p>C'est le composant qui transforme le nom <code>TRIAGE-AI-SERVICE</code> en vraie adresse. Il demande à Eureka la liste des instances et en choisit une (round-robin). Il travaille <b>à l'intérieur de l'application Java</b> : il n'a pas de port ni d'URL propres.</p>
+<table>
+  <tr><th>Élément</th><th>Emplacement</th></tr>
+  <tr><td>Dépendance</td><td class="path">emergency-service/pom.xml — ligne 56 : <code>spring-cloud-starter-loadbalancer</code></td></tr>
+  <tr><td>Route <code>lb://</code> de la Gateway</td><td class="path">api-gateway/src/main/resources/application.properties — lignes 18-34 (le préfixe <code>lb://</code> = « passe par le LoadBalancer »)</td></tr>
+  <tr><td>Ancienne version (conservée)</td><td class="path">emergency-service/src/main/java/com/rescuenet/emergency/remote/HttpConfig.java — ligne 28 : <code>@LoadBalanced</code></td></tr>
+</table>
+<p>Autres notions voisines, qui ne sont <b>pas</b> utilisées dans le projet : <b>Spring Cloud Config Server</b> (configuration centralisée) et <b>Resilience4j</b> (circuit breaker).</p>
+
+<!-- ============================ 8. KEYCLOAK ============================ -->
+<h2>8. Keycloak — authentification et JWT</h2>
+<h3>Rôle</h3>
+<p>Keycloak est le <b>serveur d'identité</b> : il connaît les utilisateurs, vérifie leurs mots de passe, leur attribue des <b>rôles</b> et émet des <b>jetons JWT</b> signés. Les services n'ont jamais accès aux mots de passe : la Gateway vérifie seulement la signature du jeton et lit les rôles qu'il contient.</p>
+<h3>Le circuit d'une connexion</h3>
+<ol>
+  <li>Le navigateur ouvre le frontend ; <code>keycloak-js</code> redirige vers la page de connexion Keycloak (protocole OpenID Connect, <b>code + PKCE</b>).</li>
+  <li>L'utilisateur saisit son identifiant et son mot de passe <b>sur Keycloak</b>.</li>
+  <li>Keycloak renvoie un code ; le frontend l'échange contre un <b>JWT</b> (valable 15 minutes, renouvelé automatiquement).</li>
+  <li>Chaque appel API porte l'en-tête <code>Authorization: Bearer &lt;jwt&gt;</code>.</li>
+  <li>La Gateway vérifie la signature (clés publiques de Keycloak), lit <code>realm_access.roles</code> et applique les règles par rôle.</li>
+</ol>
+<h3>Emplacement dans le code</h3>
+<table>
+  <tr><th>Élément</th><th>Fichier</th><th>Détail</th></tr>
+  <tr><td>Conteneur Keycloak</td><td class="path">docker-compose.infra.yml</td><td>lignes 105-126 : image <code>keycloak:26.0</code>, port 8180, import du realm</td></tr>
+  <tr><td>Realm, rôles, comptes, clients</td><td class="path">keycloak/rescuenet-realm.json</td><td>realm <code>rescuenet</code> ; rôles OPERATEUR et ADMIN (lignes 12-20) ; client <code>rescuenet-frontend</code> (ligne 25) ; comptes <code>operateur</code> et <code>admin</code></td></tr>
+  <tr><td>Sécurité côté serveur</td><td class="path">api-gateway/…/SecurityConfig.java</td><td>règles par rôle, lecture du JWT</td></tr>
+  <tr><td>Adresse de Keycloak (Gateway)</td><td class="path">api-gateway/src/main/resources/application.properties</td><td>lignes 38-39</td></tr>
+  <tr><td>Connexion côté Angular</td><td class="path">frontend/src/app/core/auth.service.ts</td><td>ligne 11 : <code>new Keycloak(...)</code> ; ligne 22 : <code>init({ onLoad: 'login-required', pkceMethod: 'S256' })</code></td></tr>
+  <tr><td>Ajout du jeton aux appels</td><td class="path">frontend/src/app/core/auth.interceptor.ts</td><td>ligne 12 : en-tête <code>Authorization: Bearer</code></td></tr>
+  <tr><td>Protection des pages</td><td class="path">frontend/src/app/core/role.guard.ts, app.routes.ts</td><td>route <code>/triage</code> réservée à ADMIN (ligne 13 de <code>app.routes.ts</code>)</td></tr>
+  <tr><td>Démarrage au lancement</td><td class="path">frontend/src/app/app.config.ts</td><td><code>provideAppInitializer</code> déclenche la connexion</td></tr>
+</table>
+<h3>Comment le mettre en place soi-même (de zéro)</h3>
+<p><b>Méthode manuelle</b> (pour comprendre) — console Keycloak, <b>http://localhost:8180</b>, compte <code>admin</code> / <code>admin123</code> :</p>
+<ol>
+  <li>Lancer Keycloak (<code>docker compose -f docker-compose.infra.yml up -d keycloak</code>).</li>
+  <li>Menu en haut à gauche : <b>Create realm</b> → nom <code>rescuenet</code> → Create.</li>
+  <li><b>Realm roles</b> → Create role : <code>OPERATEUR</code>, puis <code>ADMIN</code>.</li>
+  <li><b>Clients</b> → Create client : Client ID <code>rescuenet-frontend</code>, type OpenID Connect ; « Client authentication » <b>désactivé</b> (client public) ; « Standard flow » coché.</li>
+  <li>Dans ce client : <b>Valid redirect URIs</b> = <code>http://localhost:4200/*</code> ; <b>Web origins</b> = <code>http://localhost:4200</code> ; onglet Advanced → <b>PKCE Code Challenge Method</b> = <code>S256</code>.</li>
+  <li><b>Users</b> → Add user (<code>operateur</code>, <code>admin</code>), onglet <b>Credentials</b> → Set password (« Temporary » désactivé), onglet <b>Role mapping</b> → Assign role.</li>
+  <li>Côté Gateway : renseigner <code>issuer-uri</code> et <code>jwk-set-uri</code> (voir tableau) et écrire les règles dans <code>SecurityConfig.java</code>.</li>
+  <li>Côté Angular : installer <code>keycloak-js</code> (<code>npm i keycloak-js</code>), écrire <code>auth.service.ts</code>, l'intercepteur et le guard.</li>
+</ol>
+<p><b>Méthode automatique utilisée dans ce projet</b> : tout le realm (rôles, comptes, client) est décrit dans <span class="path">keycloak/rescuenet-realm.json</span> et importé au démarrage grâce à la commande <code>start-dev --import-realm</code> du conteneur. Vos amis n'ont donc <b>rien à configurer</b> : les deux comptes existent dès le premier lancement.</p>
+<table>
+  <tr><th>Compte</th><th>Mot de passe</th><th>Rôles</th></tr>
+  <tr><td><code>operateur</code></td><td><code>operateur123</code></td><td>OPERATEUR</td></tr>
+  <tr><td><code>admin</code></td><td><code>admin123</code></td><td>ADMIN (+ OPERATEUR)</td></tr>
+</table>
+<div class="note warn">Ce sont des comptes de <b>démonstration</b>. Keycloak n'importe le realm que si sa base est vide : si vous modifiez le fichier JSON, supprimez le volume (<code>docker compose down -v</code>) pour le réimporter. Le client <code>rescuenet-cli</code> (connexion directe par mot de passe) sert uniquement aux tests Postman : il est à retirer en production.</div>
+
+<!-- ============================ 9. ROLES ============================ -->
+<h2>9. Les rôles OPERATEUR et ADMIN</h2>
+<h3>Qui est qui</h3>
+<ul>
+  <li><b>OPERATEUR</b> : employé du centre d'appels d'urgence. Il décroche, saisit l'urgence dans l'application et suit la mission. Ce n'est ni le citoyen (qui appelle par téléphone), ni une application propre à un hôpital.</li>
+  <li><b>ADMIN</b> : responsable de la plateforme. Il a tous les droits de l'opérateur, plus l'accès au triage IA et la modification des dossiers patients.</li>
+</ul>
+<h3>Droits de chaque rôle (appliqués par la Gateway)</h3>
+<table>
+  <tr><th>Action</th><th>OPERATEUR</th><th>ADMIN</th></tr>
+  <tr><td>Créer une urgence (<code>POST /api/emergencies</code>)</td><td>✔</td><td>✔</td></tr>
+  <tr><td>Suivre les missions (<code>GET /api/emergencies/**</code>)</td><td>✔</td><td>✔</td></tr>
+  <tr><td>Consulter patients, hôpitaux, ambulances (<code>GET</code>)</td><td>✔</td><td>✔</td></tr>
+  <tr><td>Créer / modifier un dossier patient (<code>POST</code>, <code>PUT /api/patients/**</code>)</td><td>✘ (403)</td><td>✔</td></tr>
+  <tr><td>Triage IA (<code>/api/triage/**</code>)</td><td>✘ (403)</td><td>✔</td></tr>
+  <tr><td>Actuator, lien Eureka dans le menu</td><td>✘</td><td>✔</td></tr>
+  <tr><td>Sans jeton</td><td colspan="2">401 (non authentifié)</td></tr>
+</table>
+<p>Dans l'interface : l'opérateur ne voit pas le menu « Triage IA » ni le bouton « Modifier le dossier » ; s'il tape l'adresse <code>/triage</code>, il obtient la page « Accès refusé ». Les règles sont écrites à <span class="path">api-gateway/…/SecurityConfig.java</span> (lignes 45-54) et dans <span class="path">frontend/src/app/app.routes.ts</span>.</p>
+
+<!-- ============================ 10. BASES ============================ -->
+<h2>10. Les bases de données de chaque service</h2>
+<p>Règle d'or des microservices : <b>une base par service</b>, jamais d'accès croisé. Chaque base est choisie pour son usage.</p>
+<table>
+  <tr><th>Service</th><th>Base</th><th>Pourquoi ce choix</th><th>Où la connexion est configurée</th><th>Où sont les modèles de données</th></tr>
+  <tr><td>emergency-service</td><td><b>PostgreSQL</b> (5433)</td><td>missions et statuts : données relationnelles, transactions</td><td class="path">emergency-service/src/main/resources/application.properties lignes 5-7</td><td class="path">…/mission/Mission.java (ligne 14), <code>MissionRepository</code></td></tr>
+  <tr><td>patient-record-service</td><td><b>MongoDB</b> (27017)</td><td>dossier médical : document flexible avec listes et historique imbriqué</td><td class="path">patient-record-service/src/server.js ligne 12</td><td class="path">patient-record-service/src/models.js (lignes 3 et 14)</td></tr>
+  <tr><td>triage-ai-service</td><td><b>MySQL</b> (3306)</td><td>historique des triages (écosystème Python)</td><td class="path">triage-ai-service/app/main.py ligne 23</td><td class="path">triage-ai-service/app/main.py (classe <code>TriageRecord</code>, ligne 35)</td></tr>
+  <tr><td>hospital-service</td><td><b>SQL Server</b> (1433)</td><td>lits : décrément atomique, forte cohérence</td><td class="path">hospital-service/Program.cs ligne 10</td><td class="path">hospital-service/Data.cs (<code>Hospital</code> ligne 5, <code>BedReservation</code> ligne 21)</td></tr>
+  <tr><td>dispatch-service</td><td><b>Redis</b> (6379)</td><td>flotte et positions GPS : <code>GEOSEARCH</code> très rapide</td><td class="path">dispatch-service/main.go ligne 42</td><td class="path">dispatch-service/store.go (ligne 115 : recherche géographique)</td></tr>
+</table>
+<p><b>Où les bases sont lancées :</b> <span class="path">docker-compose.infra.yml</span> (un conteneur par base, avec un volume pour conserver les données). En Docker, les adresses sont remplacées par des variables d'environnement dans <span class="path">docker-compose.yml</span> (par exemple <code>SPRING_DATASOURCE_URL</code>, <code>MONGO_URL</code>, <code>MYSQL_URL</code>, <code>ConnectionStrings__Hospital</code>, <code>REDIS_ADDR</code>) afin de pointer vers le <b>nom du conteneur</b> au lieu de <code>localhost</code>.</p>
+
+<!-- ============================ 11. RABBITMQ ============================ -->
+<h2>11. RabbitMQ — communication asynchrone</h2>
+<h3>Rôle</h3>
+<p>Les appels OpenFeign sont <b>synchrones</b> : on attend la réponse. RabbitMQ sert aux situations où l'on n'attend rien : un service <b>publie un événement</b>, d'autres <b>le consomment</b> quand ils le peuvent. Le producteur ne connaît pas les consommateurs : le couplage est très faible. Si un consommateur est arrêté, le message attend dans sa file.</p>
+<h3>Vocabulaire</h3>
+<table>
+  <tr><th>Terme</th><th>Dans le projet</th></tr>
+  <tr><td>Producer</td><td>celui qui publie (dispatch, emergency)</td></tr>
+  <tr><td>Exchange (de type <i>topic</i>)</td><td><code>rescuenet.events</code> : reçoit les messages et les aiguille</td></tr>
+  <tr><td>Routing key</td><td>l'étiquette du message : <code>mission.status.changed</code>, <code>mission.completed</code>, <code>mission.dispatched</code></td></tr>
+  <tr><td>Queue</td><td>file d'attente propre à chaque consommateur</td></tr>
+  <tr><td>Consumer</td><td>celui qui lit sa file (emergency, hospital, patient-record, dispatch)</td></tr>
+</table>
+<h3>Les événements</h3>
+<table>
+  <tr><th>Événement</th><th>Producteur</th><th>Consommateurs</th><th>Effet</th></tr>
+  <tr><td><code>mission.status.changed</code> (ON_SCENE, TRANSPORTING, ARRIVED)</td><td>dispatch-service</td><td>emergency-service (file <code>emergency.status-changed</code>)</td><td>met à jour le statut de la mission</td></tr>
+  <tr><td><code>mission.completed</code></td><td>emergency-service</td><td>hospital (<code>hospital.mission-completed</code>), patient-record (<code>patient-record.mission-completed</code>), dispatch</td><td>admission du patient, intervention ajoutée au dossier, ambulance libérée</td></tr>
+  <tr><td><code>mission.dispatched</code></td><td>emergency-service</td><td>informatif</td><td>—</td></tr>
+</table>
+<h3>Emplacement dans le code</h3>
+<table>
+  <tr><th>Élément</th><th>Fichier</th></tr>
+  <tr><td>Le serveur RabbitMQ</td><td class="path">docker-compose.infra.yml — ligne 86 (service <code>rabbitmq</code>, ports 5672 et 15672)</td></tr>
+  <tr><td>Exchange, file, liaison (Java)</td><td class="path">emergency-service/src/main/java/com/rescuenet/emergency/events/RabbitConfig.java — lignes 13-28</td></tr>
+  <tr><td>Publication (Java)</td><td class="path">…/events/MissionPublisher.java (<code>RabbitTemplate</code>)</td></tr>
+  <tr><td>Réception (Java)</td><td class="path">…/events/DispatchStatusListener.java (<code>@RabbitListener</code>)</td></tr>
+  <tr><td>Configuration de connexion</td><td class="path">emergency-service/src/main/resources/application.properties — lignes 12-19</td></tr>
+  <tr><td>Go</td><td class="path">dispatch-service/events.go — <code>Publish</code> (ligne 50), <code>consume</code> (ligne 82)</td></tr>
+  <tr><td>C#</td><td class="path">hospital-service/EventConsumer.cs (file <code>hospital.mission-completed</code>)</td></tr>
+  <tr><td>Node.js</td><td class="path">patient-record-service/src/events.js (file <code>patient-record.mission-completed</code>)</td></tr>
+</table>
+<p><b>Voir les messages :</b> console RabbitMQ <b>http://localhost:15672</b> (<code>rescue</code> / <code>rescue123</code>) → onglets <i>Exchanges</i> et <i>Queues</i>.</p>
+
+<!-- ============================ 12. SWAGGER ============================ -->
+<h2>12. Swagger et OpenAPI</h2>
+<h3>Rôle</h3>
+<p><b>OpenAPI</b> est un standard qui décrit une API REST dans un fichier (JSON) : routes, paramètres, formats, codes de réponse. <b>Swagger UI</b> est la page web qui lit ce fichier et permet de <b>lire la documentation et tester les routes dans le navigateur</b>, sans Postman. (Vous avez écrit « open IA » : il s'agit bien d'<b>OpenAPI</b>, sans lien avec l'intelligence artificielle.)</p>
+<h3>Comment se connecter à Swagger</h3>
+<p>Il n'y a <b>pas de compte à saisir</b> : on ouvre simplement l'adresse du service dans le navigateur.</p>
+<table>
+  <tr><th>Service</th><th>Adresse Swagger UI</th><th>Fichier OpenAPI (JSON)</th></tr>
+  <tr><td>emergency-service</td><td><b>http://localhost:8081/swagger-ui.html</b></td><td><code>/v3/api-docs</code></td></tr>
+  <tr><td>patient-record-service</td><td><b>http://localhost:8082/swagger-ui</b></td><td><code>/v3/api-docs</code></td></tr>
+  <tr><td>triage-ai-service</td><td><b>http://localhost:8083/docs</b></td><td><code>/openapi.json</code></td></tr>
+  <tr><td>hospital-service</td><td><b>http://localhost:8084/swagger-ui</b></td><td><code>/v3/api-docs</code></td></tr>
+  <tr><td>dispatch-service</td><td><b>http://localhost:8085/swagger-ui</b></td><td><code>/v3/api-docs</code></td></tr>
+</table>
+<h4>Tester une route</h4>
+<ol>
+  <li>Ouvrir l'adresse (par exemple celle d'emergency-service).</li>
+  <li>Cliquer sur une route (ex. <code>POST /api/emergencies</code>) pour la déplier.</li>
+  <li>Cliquer <b>Try it out</b>, modifier le JSON d'exemple (copier <code>scripts/demo-emergency.json</code>).</li>
+  <li>Cliquer <b>Execute</b> : la réponse (code, corps JSON) s'affiche en dessous.</li>
+</ol>
+<div class="note warn">Swagger appelle le service <b>directement</b> (ports 8081 à 8085), sans passer par la Gateway : il n'y a donc pas de contrôle de jeton ni de rôle. C'est pratique pour la démonstration. Pour tester les <b>rôles</b> (401, 403) via la Gateway, utilisez la collection Postman <span class="path">docs/postman/</span>. Les interfaces des services Node, C# et Go chargent leurs fichiers depuis <code>unpkg.com</code> : une connexion internet est nécessaire.</div>
+<h3>Emplacement dans le code</h3>
+<table>
+  <tr><th>Service</th><th>Fichiers</th></tr>
+  <tr><td>emergency (Java)</td><td class="path">emergency-service/pom.xml ligne 63 (<code>springdoc-openapi-starter-webmvc-ui</code>) ; application.properties lignes 44-45 ; annotations <code>@Tag</code> / <code>@Operation</code> dans …/web/EmergencyController.java</td></tr>
+  <tr><td>patient-record (Node)</td><td class="path">patient-record-service/src/openapi.js (la spécification) ; src/server.js ligne 44 (<code>swagger-ui-express</code>)</td></tr>
+  <tr><td>triage-ai (Python)</td><td class="path">natif dans FastAPI : triage-ai-service/app/main.py ligne 84 (<code>FastAPI(...)</code>) — aucune configuration supplémentaire</td></tr>
+  <tr><td>hospital (C#)</td><td class="path">hospital-service/Program.cs lignes 11 (<code>AddOpenApi</code>), 29 (<code>MapOpenApi</code>), 30 (page <code>/swagger-ui</code>)</td></tr>
+  <tr><td>dispatch (Go)</td><td class="path">dispatch-service/openapi.go (fonction <code>registerDocs</code>, ligne 10)</td></tr>
+</table>
+
+<!-- ============================ 13. DOCKER ============================ -->
+<h2>13. Docker : pourquoi une image par service</h2>
+<h3>Le problème que Docker résout</h3>
+<p>Ce projet utilise <b>cinq langages</b> (Java, Node.js, Python, C#, Go) et six technologies de données. Sans Docker, chaque ami devrait installer JDK 21, Node 22, Python 3.12, .NET 10, Go, Maven, puis configurer chaque base, et le projet « marcherait sur ma machine » seulement. <b>Une image Docker contient le programme <i>et</i> tout ce dont il a besoin</b> : le résultat est le même sur toutes les machines.</p>
+<h3>Pourquoi une image <i>par service</i></h3>
+<ul>
+  <li><b>Indépendance</b> : on reconstruit, redémarre ou met à l'échelle un service sans toucher aux autres (principe du déploiement indépendant des microservices).</li>
+  <li><b>Isolation</b> : chaque service a ses propres dépendances et versions, sans conflit.</li>
+  <li><b>Isolation des pannes</b> : si un conteneur plante ou est arrêté, les autres continuent (démo : <code>docker stop rescuenet-dispatch</code>).</li>
+  <li><b>Images légères</b> : Dockerfile en <b>deux étapes</b> (construction puis exécution) : l'image finale ne contient pas les outils de compilation (ex. dispatch : 55 Mo, frontend : 75 Mo).</li>
+  <li><b>Reproductibilité</b> : même version partout, ce qui facilite les tests et la soutenance.</li>
+</ul>
+<h3>Les 8 Dockerfile</h3>
+<table>
+  <tr><th>Dossier</th><th>Base de construction → base d'exécution</th><th>Particularité</th></tr>
+  <tr><td class="path">discovery-server/Dockerfile</td><td>temurin-21-jdk → temurin-21-jre</td><td>sonde de santé (<code>HEALTHCHECK</code>) utilisée par Compose</td></tr>
+  <tr><td class="path">api-gateway/Dockerfile</td><td>temurin-21-jdk → temurin-21-jre</td><td>—</td></tr>
+  <tr><td class="path">emergency-service/Dockerfile</td><td>temurin-21-jdk → temurin-21-jre</td><td>compile avec <code>mvnw</code> (Maven inclus au projet)</td></tr>
+  <tr><td class="path">patient-record-service/Dockerfile</td><td>node:22-alpine</td><td><code>npm ci --omit=dev</code>, utilisateur non root</td></tr>
+  <tr><td class="path">triage-ai-service/Dockerfile</td><td>python:3.12-slim</td><td>entraîne le modèle d'IA <b>pendant la construction</b> (<code>train_model.py</code>)</td></tr>
+  <tr><td class="path">hospital-service/Dockerfile</td><td>dotnet/sdk:10.0 → dotnet/aspnet:10.0</td><td>—</td></tr>
+  <tr><td class="path">dispatch-service/Dockerfile</td><td>golang:1.27-alpine → alpine:3.20</td><td>binaire statique, image minuscule</td></tr>
+  <tr><td class="path">frontend/Dockerfile (+ nginx.conf)</td><td>node:22-alpine → nginx:alpine</td><td>nginx sert l'application Angular compilée</td></tr>
+</table>
+<p>Les fichiers <code>.dockerignore</code> de chaque dossier empêchent de copier dans l'image les dossiers inutiles (<code>node_modules</code>, <code>target</code>, <code>.venv</code>, <code>bin</code>, <code>obj</code>…).</p>
+
+<!-- ============================ 14. COMPOSE ============================ -->
+<h2>14. Docker Compose : pourquoi dans les microservices</h2>
+<h3>Rôle</h3>
+<p>Avec 8 services applicatifs et 7 éléments d'infrastructure, soit <b>15 conteneurs</b>, les lancer un par un avec <code>docker run</code> serait long et source d'erreurs. <b>Docker Compose</b> décrit l'ensemble dans un fichier et le démarre en <b>une seule commande</b> : <code>docker compose up -d --build</code>.</p>
+<h3>Ce que Compose apporte</h3>
+<ul>
+  <li><b>Un réseau commun</b> : les conteneurs se joignent par leur <b>nom</b> (<code>discovery-server</code>, <code>rabbitmq</code>, <code>postgres-emergency</code>…), sans adresse IP.</li>
+  <li><b>L'ordre de démarrage</b> (<code>depends_on</code> + <code>healthcheck</code>) : bases et RabbitMQ d'abord, puis Eureka, puis les services, puis le frontend.</li>
+  <li><b>La configuration</b> (variables d'environnement) : où se trouve chaque base, quel Eureka utiliser.</li>
+  <li><b>Les volumes</b> : les données des bases survivent à un redémarrage.</li>
+  <li><b>Les ports publiés</b> : identiques pour tout le monde (4200, 8080, 8761…).</li>
+  <li><b>Des commandes simples</b> pour tout arrêter, voir l'état, lire les logs.</li>
+</ul>
+<h3>Les deux fichiers</h3>
+<table>
+  <tr><th>Fichier</th><th>Contenu</th></tr>
+  <tr><td class="path">docker-compose.infra.yml</td><td>7 conteneurs d'infrastructure : PostgreSQL, MongoDB, MySQL, SQL Server, Redis, RabbitMQ, Keycloak</td></tr>
+  <tr><td class="path">docker-compose.yml</td><td>les 8 applications ; il <b>inclut</b> le fichier d'infrastructure (ligne 12 : <code>include:</code>)</td></tr>
+</table>
+<div class="note">Deux modes : <b>Docker</b> (tout en conteneurs, <code>docker compose up -d --build</code>) ou <b>développement</b> (infrastructure en Docker + services en processus locaux avec <code>scripts\start-all.ps1</code>). Ne pas utiliser les deux en même temps : les ports se chevauchent.</div>
+
+<!-- ============================ 15. CLONER ============================ -->
+<h2 class="pb">15. Cloner et lancer le projet (pour vos amis)</h2>
+<p>Avec cette méthode, vos amis obtiennent <b>exactement les mêmes ports que vous</b> : ils sont fixés dans <span class="path">docker-compose.yml</span>. Rien à installer à part Git et Docker Desktop (pas besoin de Java, Node, Python, .NET ni Go).</p>
+
+<h3>Étape 0 — Prérequis</h3>
+<table>
+  <tr><th>Outil</th><th>Détail</th></tr>
+  <tr><td><b>Git</b></td><td>https://git-scm.com/downloads</td></tr>
+  <tr><td><b>Docker Desktop</b></td><td>https://www.docker.com/products/docker-desktop — sous Windows, activer <b>WSL 2</b> (proposé à l'installation)</td></tr>
+  <tr><td><b>Mémoire</b></td><td>au moins <b>6 Go de RAM libres</b> ; donner <b>5 Go ou plus</b> à Docker (Docker Desktop → Settings → Resources → Memory)</td></tr>
+  <tr><td><b>Espace disque</b></td><td>environ 10 Go (images et conteneurs)</td></tr>
+  <tr><td><b>Internet</b></td><td>indispensable au premier lancement (téléchargement des images) et pour les cartes</td></tr>
+  <tr><td><b>Ports libres</b></td><td>4200, 8080-8085, 8761, 8180, 9000, 5433, 27017, 3306, 1433, 6379, 5672, 15672 (fermer tout autre programme qui les utilise)</td></tr>
+</table>
+<div class="note warn"><b>Mac avec puce Apple (M1/M2/M3)</b> : l'image SQL Server n'existe qu'en architecture Intel ; il faut activer « Use Rosetta for x86_64/amd64 emulation » dans Docker Desktop. Je n'ai pas testé le projet sur Mac : prévoyez un peu de dépannage.</div>
+
+<h3>Étape 1 — Cloner le dépôt</h3>
+<p>Ouvrir un terminal (PowerShell, Terminal macOS ou Git Bash) dans le dossier de votre choix :</p>
+<pre><code>git clone -b feature/docker-keycloak-angular https://github.com/ahmed4gaddes/-RescueNet-microservices.git RescueNet
+cd RescueNet</code></pre>
+<p class="small">Le travail se trouve pour l'instant sur la branche <code>feature/docker-keycloak-angular</code>. Une fois cette branche fusionnée dans <code>main</code>, la commande simplifiée suffira : <code>git clone https://github.com/ahmed4gaddes/-RescueNet-microservices.git RescueNet</code>. Le dossier final <code>RescueNet</code> est choisi exprès : le nom du dépôt commence par un tiret, ce qui gêne la commande <code>cd</code>.</p>
+<p>Si le dépôt est privé, GitHub demandera de vous connecter (le propriétaire doit ajouter vos comptes comme collaborateurs : Settings → Collaborators).</p>
+
+<h3>Étape 2 — Démarrer Docker Desktop</h3>
+<ol>
+  <li>Lancer <b>Docker Desktop</b> (menu Démarrer / Applications).</li>
+  <li>Attendre que l'état en bas à gauche indique <b>« Engine running »</b> (icône verte).</li>
+  <li>Vérifier dans le terminal : <code>docker info</code> ne doit afficher aucune erreur.</li>
+</ol>
+
+<h3>Étape 3 — Construire les images et lancer les serveurs</h3>
+<pre><code>docker compose up -d --build</code></pre>
+<ul>
+  <li><b>Première fois</b> : Docker télécharge les images de base et construit les 8 images de l'application. Comptez <b>de 10 à 40 minutes</b> selon la connexion.</li>
+  <li><b>Les fois suivantes</b> : 1 à 2 minutes (tout est en cache).</li>
+  <li>Docker démarre les 15 conteneurs dans le bon ordre (bases, RabbitMQ, Keycloak, puis Eureka, puis les services, puis le frontend).</li>
+</ul>
+<p>Suivre l'avancement :</p>
+<pre><code>docker compose ps               # état des 15 conteneurs (Up / healthy)
+docker compose logs -f emergency-service    # logs d'un service (Ctrl+C pour quitter)</code></pre>
+
+<h3>Étape 4 — Vérifier les serveurs dans Eureka</h3>
+<p>Attendre environ une minute après le démarrage, puis ouvrir <b>http://localhost:8761</b>. On doit voir <b>6 applications en UP</b> :</p>
+<p>API-GATEWAY · EMERGENCY-SERVICE · PATIENT-RECORD-SERVICE · TRIAGE-AI-SERVICE · HOSPITAL-SERVICE · DISPATCH-SERVICE</p>
+
+<h3>Étape 5 — Ouvrir le frontend et se connecter</h3>
+<p>Ouvrir <b>http://localhost:4200</b> : la page de connexion Keycloak s'affiche. Comptes :</p>
+<table>
+  <tr><th>Compte</th><th>Mot de passe</th><th>Rôle</th></tr>
+  <tr><td><code>operateur</code></td><td><code>operateur123</code></td><td>Opérateur</td></tr>
+  <tr><td><code>admin</code></td><td><code>admin123</code></td><td>Administrateur</td></tr>
+</table>
+
+<h3>Étape 6 — Scénario rapide à jouer</h3>
+<ol>
+  <li>Se connecter en <code>operateur</code> → bouton <b>✚ Signaler une urgence</b> → <b>Remplir avec la démo</b> → <b>🚑 Lancer le dispatch</b>.</li>
+  <li>Sur « Suivi de mission » : triage ROUGE, hôpital, ambulance qui bouge sur la carte, frise jusqu'à <b>Admis</b> (environ 15 secondes).</li>
+  <li>Menus <b>Missions</b>, <b>Patients</b>, <b>Hôpitaux</b>, <b>Ambulances</b> ; essayer <code>/triage</code> : « Accès refusé ».</li>
+  <li>Bouton <b>Se déconnecter</b>, puis se connecter en <code>admin</code> : menu <b>Triage IA</b>, bouton <b>Modifier le dossier</b> d'un patient.</li>
+  <li>Panne : <code>docker stop rescuenet-dispatch</code>, relancer une urgence → message « Service indispensable indisponible : DISPATCH-SERVICE » ; puis <code>docker start rescuenet-dispatch</code>.</li>
+</ol>
+<p>Le scénario détaillé est dans <span class="path">docs/SCENARIO-DEMO.md</span>.</p>
+
+<h3>Arrêter et relancer</h3>
+<pre><code>docker compose down            # arrête et supprime les conteneurs (les données sont conservées)
+docker compose up -d           # relance (sans reconstruire)
+docker compose down -v         # arrête ET efface toutes les données (repartir de zéro)</code></pre>
+
+<h3>Problèmes fréquents</h3>
+<table>
+  <tr><th>Symptôme</th><th>Cause probable</th><th>Solution</th></tr>
+  <tr><td><code>failed to connect to the docker API</code></td><td>Docker Desktop n'est pas démarré</td><td>le lancer et attendre « Engine running »</td></tr>
+  <tr><td><code>port is already allocated</code></td><td>un autre programme utilise le port</td><td>fermer ce programme (ex. un PostgreSQL local sur 5432 n'est pas gênant : le projet utilise 5433)</td></tr>
+  <tr><td>Conteneurs qui s'arrêtent, machine lente</td><td>mémoire insuffisante</td><td>donner plus de RAM à Docker, fermer les autres applications</td></tr>
+  <tr><td>Page de connexion en erreur</td><td>Keycloak pas encore prêt</td><td>attendre 1 à 2 minutes, actualiser</td></tr>
+  <tr><td>Un service manque dans Eureka</td><td>démarrage en cours</td><td>patienter, puis <code>docker compose logs &lt;service&gt;</code></td></tr>
+  <tr><td>Réponse 409 « Aucun lit disponible »</td><td>beaucoup d'urgences en peu de temps</td><td>attendre la sortie automatique (3 minutes) ou <code>docker compose down -v</code></td></tr>
+  <tr><td>Cartes grises</td><td>pas d'internet</td><td>vérifier la connexion</td></tr>
+</table>
+
+<!-- ============================ 16. PUSH ============================ -->
+<h2>16. Pousser le travail sur GitHub</h2>
+<h3>Mon travail (déjà fait)</h3>
+<p>Le travail est poussé sur la branche <code>feature/docker-keycloak-angular</code> du dépôt <b>https://github.com/ahmed4gaddes/-RescueNet-microservices</b>. Pour qu'il soit la version par défaut, fusionnez la branche dans <code>main</code> : soit via le bouton <b>Compare &amp; pull request</b> sur GitHub puis <b>Merge</b>, soit en ligne de commande :</p>
+<pre><code>git checkout main
+git pull
+git merge feature/docker-keycloak-angular
+git push origin main</code></pre>
+<h3>Pour un ami qui modifie le projet</h3>
+<pre><code>git pull                                   # récupérer les dernières modifications
+git checkout -b feature/ma-fonctionnalite  # travailler sur sa propre branche
+# ... modifier les fichiers ...
+git status                                 # voir ce qui a changé
+git add .
+git commit -m "Description claire de la modification"
+git push -u origin feature/ma-fonctionnalite
+# puis ouvrir une « Pull Request » sur GitHub pour la relire avant de fusionner</code></pre>
+<div class="note">Ne jamais ajouter au dépôt : <code>node_modules</code>, <code>target</code>, <code>logs/</code>, fichiers <code>.exe</code>, mots de passe réels. Le fichier <code>.gitignore</code> en exclut déjà la plupart.</div>
+
+<!-- ============================ 17. ANNEXE ============================ -->
+<h2>17. Annexe : commandes utiles</h2>
+<table>
+  <tr><th>Besoin</th><th>Commande</th></tr>
+  <tr><td>Tout démarrer (Docker)</td><td><code>docker compose up -d --build</code></td></tr>
+  <tr><td>État des conteneurs</td><td><code>docker compose ps</code></td></tr>
+  <tr><td>Logs d'un service</td><td><code>docker compose logs -f &lt;service&gt;</code> (ex. <code>emergency-service</code>)</td></tr>
+  <tr><td>Redémarrer un service</td><td><code>docker compose restart hospital-service</code></td></tr>
+  <tr><td>Reconstruire un seul service</td><td><code>docker compose up -d --build hospital-service</code></td></tr>
+  <tr><td>Arrêter un conteneur (panne simulée)</td><td><code>docker stop rescuenet-dispatch</code> puis <code>docker start rescuenet-dispatch</code></td></tr>
+  <tr><td>Tout arrêter</td><td><code>docker compose down</code></td></tr>
+  <tr><td>Tout arrêter et effacer les données</td><td><code>docker compose down -v</code></td></tr>
+  <tr><td>Mode développement (sans conteneurs pour les services)</td><td><code>docker compose -f docker-compose.infra.yml up -d</code> puis <code>powershell -ExecutionPolicy Bypass -File scripts\start-all.ps1</code> ; arrêt : <code>scripts\stop-all.ps1 -WithInfra</code></td></tr>
+  <tr><td>Tests Postman en ligne de commande</td><td><code>npx newman run docs\postman\RescueNet.postman_collection.json -e docs\postman\RescueNet.postman_environment.json</code></td></tr>
+</table>
+<h3>Documents du dépôt</h3>
+<table>
+  <tr><th>Fichier</th><th>Contenu</th></tr>
+  <tr><td class="path">README.md</td><td>vue d'ensemble, installation, lancement</td></tr>
+  <tr><td class="path">docs/ARCHITECTURE.md</td><td>diagrammes d'architecture, de séquence (saga), de déploiement et de sécurité</td></tr>
+  <tr><td class="path">docs/API.md</td><td>routes, rôles, Swagger, événements RabbitMQ</td></tr>
+  <tr><td class="path">docs/JUSTIFICATION-ARCHITECTURE.md</td><td>monolithe, SOA ou microservices ; limites ; choix d'outils</td></tr>
+  <tr><td class="path">docs/VEILLE-OBSERVABILITE.md</td><td>équivalents d'Actuator pour Node.js et Python</td></tr>
+  <tr><td class="path">docs/SCENARIO-DEMO.md</td><td>démarrage pas à pas et scénario par rôle</td></tr>
+  <tr><td class="path">docs/postman/</td><td>collection et environnement Postman</td></tr>
+</table>
+
+</body>
+</html>
